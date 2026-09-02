@@ -10,12 +10,12 @@ TOPICS=(
   inventory.failed
   shipping.scheduled
   shipping.failed
-  saga.closed
+  closed
 )
 
 echo "Creating Kafka topics..."
 for topic in "${TOPICS[@]}"; do
-  docker exec saga-kafka kafka-topics.sh \
+  docker exec saga-kafka /opt/kafka/bin/kafka-topics.sh \
     --bootstrap-server localhost:9092 \
     --create --if-not-exists \
     --topic "${TOPIC_PREFIX}${topic}" \

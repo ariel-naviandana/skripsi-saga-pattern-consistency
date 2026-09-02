@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 
+	"github.com/ariel-naviandana/skripsi-saga-pattern-consistency/internal/business"
+	"github.com/ariel-naviandana/skripsi-saga-pattern-consistency/internal/choreography"
 	"github.com/ariel-naviandana/skripsi-saga-pattern-consistency/internal/common"
+	httph "github.com/ariel-naviandana/skripsi-saga-pattern-consistency/internal/http"
 )
 
 func main() {
@@ -23,11 +25,33 @@ func main() {
 		log.Fatalf("inventory: init schema: %v", err)
 	}
 
+	biz := &business.InventoryService{Pool: pool}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", common.HealthHandler("inventory"))
 
-	log.Printf("inventory-service ready on %s", common.Addr(cfg.Port))
+	switch cfg.Approach {
+	case "orchestration":
+		bh := &httph.BusinessHandler{Inventory: biz}
+		mux.HandleFunc("/inventory", bh.InventoryReserve)
+		mux.HandleFunc("/inventory/compensate", bh.InventoryCompensate)
+	default: // choreography
+		producer, err := choreography.NewProducer(cfg.KafkaBrokers)
+		if err != nil {
+			log.Fatalf("inventory: kafka producer: %v", err)
+		}
+		defer producer.Close()
+
+		choreo := &choreography.InventoryService{Biz: biz, Pub: producer, Brokers: cfg.KafkaBrokers}
+		go func() {
+			log.Printf("inventory: starting choreography consumers")
+			if err := choreo.Run(ctx); err != nil {
+				log.Printf("inventory: consumers stopped: %v", err)
+			}
+		}()
+	}
+
+	log.Printf("inventory-service ready (approach=%s) on %s", cfg.Approach, common.Addr(cfg.Port))
 	if err := common.Serve(common.Addr(cfg.Port), mux); err != nil {
-		log.Fatalf("inventory: serve: %v", fmt.Errorf("serve: %w", err))
+		log.Fatalf("inventory: serve: %v", err)
 	}
 }

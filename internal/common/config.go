@@ -18,6 +18,7 @@ type Config struct {
 	RedisAddr   string
 	OrchestratorURL string
 	LogLevel    string
+	Approach    string
 }
 
 func EnvOr(key, def string) string {
@@ -50,6 +51,7 @@ func LoadConfig(serviceName string) Config {
 		RedisAddr:   EnvOr("REDIS_ADDR", "saga-redis:6379"),
 		OrchestratorURL: EnvOr("ORCHESTRATOR_URL", ""),
 		LogLevel:    EnvOr("LOG_LEVEL", "info"),
+		Approach:    EnvOr("APPROACH", "choreography"),
 	}
 }
 
