@@ -1,0 +1,8 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: "saga-services"
+    static_configs:
+      - targets: ["order-service:8081", "payment-service:8082", "inventory-service:8083", "shipping-service:8084", "orchestrator:8080"]

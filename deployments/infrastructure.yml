@@ -1,0 +1,114 @@
+version: "3.9"
+
+services:
+  zookeeper:
+    image: bitnami/zookeeper:3.9
+    container_name: saga-zookeeper
+    environment:
+      ALLOW_ANONYMOUS_LOGIN: "yes"
+    ports:
+      - "2181:2181"
+    networks:
+      - saga-infra
+
+  kafka:
+    image: bitnami/kafka:3.7
+    container_name: saga-kafka
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_LISTENERS: PLAINTEXT://:9092,EXTERNAL://:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://saga-kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+      - "9094:9094"
+    depends_on:
+      - zookeeper
+    networks:
+      - saga-infra
+
+  redis:
+    image: redis:7-alpine
+    container_name: saga-redis
+    command: redis-server --appendonly yes --save 900 1
+    ports:
+      - "6379:6379"
+    networks:
+      - saga-infra
+
+  order-db:
+    image: postgres:15-alpine
+    container_name: saga-order-db
+    environment:
+      POSTGRES_USER: order_user
+      POSTGRES_PASSWORD: order_pass
+      POSTGRES_DB: order_db
+    ports:
+      - "5431:5432"
+    networks:
+      - saga-infra
+
+  payment-db:
+    image: postgres:15-alpine
+    container_name: saga-payment-db
+    environment:
+      POSTGRES_USER: payment_user
+      POSTGRES_PASSWORD: payment_pass
+      POSTGRES_DB: payment_db
+    ports:
+      - "5432:5432"
+    networks:
+      - saga-infra
+
+  inventory-db:
+    image: postgres:15-alpine
+    container_name: saga-inventory-db
+    environment:
+      POSTGRES_USER: inventory_user
+      POSTGRES_PASSWORD: inventory_pass
+      POSTGRES_DB: inventory_db
+    ports:
+      - "5433:5432"
+    networks:
+      - saga-infra
+
+  shipping-db:
+    image: postgres:15-alpine
+    container_name: saga-shipping-db
+    environment:
+      POSTGRES_USER: shipping_user
+      POSTGRES_PASSWORD: shipping_pass
+      POSTGRES_DB: shipping_db
+    ports:
+      - "5434:5432"
+    networks:
+      - saga-infra
+
+  prometheus:
+    image: prom/prometheus:v2.52
+    container_name: saga-prometheus
+    volumes:
+      - ../deployments/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9090:9090"
+    networks:
+      - saga-infra
+
+  grafana:
+    image: grafana/grafana:10.4
+    container_name: saga-grafana
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - saga-infra
+
+networks:
+  saga-infra:
+    driver: bridge
