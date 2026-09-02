@@ -1,0 +1,41 @@
+# Binaries / build artifacts
+bin/
+dist/
+build/
+*.exe
+*.dll
+*.out
+
+# Go
+vendor/
+*.test
+coverage/
+*.cover
+
+# Environment
+.env
+.env.local
+.env.development
+
+# Logs
+*.log
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Scenario results (never commit raw data)
+docs/runs/
+!docs/runs/.gitkeep
+
+# Proposal extraction artifacts
+proposal-extracted.txt
+proposal-parsed.txt
+proposal-split.txt
+
+# IDE / OS
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+**/.DS_Store
