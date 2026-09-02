@@ -1,0 +1,82 @@
+services:
+  order-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        SERVICE: order-service
+    container_name: saga-order-service
+    environment:
+      PORT: "8081"
+    ports:
+      - "8081:8081"
+    depends_on:
+      order-db:
+        condition: service_healthy
+    networks:
+      - saga-infra
+
+  payment-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        SERVICE: payment-service
+    container_name: saga-payment-service
+    environment:
+      PORT: "8082"
+    ports:
+      - "8082:8082"
+    depends_on:
+      payment-db:
+        condition: service_healthy
+    networks:
+      - saga-infra
+
+  inventory-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        SERVICE: inventory-service
+    container_name: saga-inventory-service
+    environment:
+      PORT: "8083"
+    ports:
+      - "8083:8083"
+    depends_on:
+      inventory-db:
+        condition: service_healthy
+    networks:
+      - saga-infra
+
+  shipping-service:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        SERVICE: shipping-service
+    container_name: saga-shipping-service
+    environment:
+      PORT: "8084"
+    ports:
+      - "8084:8084"
+    depends_on:
+      shipping-db:
+        condition: service_healthy
+    networks:
+      - saga-infra
+
+  orchestrator:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        SERVICE: orchestrator
+    container_name: saga-orchestrator
+    environment:
+      PORT: "8080"
+    ports:
+      - "8080:8080"
+    networks:
+      - saga-infra

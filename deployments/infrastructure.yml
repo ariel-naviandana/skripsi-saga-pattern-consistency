@@ -34,6 +34,11 @@ services:
       POSTGRES_USER: order_user
       POSTGRES_PASSWORD: order_pass
       POSTGRES_DB: order_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U order_user -d order_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
     ports:
       - "5431:5432"
     networks:
@@ -46,6 +51,11 @@ services:
       POSTGRES_USER: payment_user
       POSTGRES_PASSWORD: payment_pass
       POSTGRES_DB: payment_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U payment_user -d payment_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
     ports:
       - "5432:5432"
     networks:
@@ -58,6 +68,11 @@ services:
       POSTGRES_USER: inventory_user
       POSTGRES_PASSWORD: inventory_pass
       POSTGRES_DB: inventory_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U inventory_user -d inventory_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
     ports:
       - "5433:5432"
     networks:
@@ -70,6 +85,11 @@ services:
       POSTGRES_USER: shipping_user
       POSTGRES_PASSWORD: shipping_pass
       POSTGRES_DB: shipping_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shipping_user -d shipping_db"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
     ports:
       - "5434:5432"
     networks:

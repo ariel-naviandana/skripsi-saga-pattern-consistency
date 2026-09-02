@@ -1,0 +1,5 @@
+name: saga
+
+include:
+  - deployments/infrastructure.yml
+  - deployments/services.yml
