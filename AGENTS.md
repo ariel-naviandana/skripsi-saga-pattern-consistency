@@ -20,21 +20,24 @@ go build ./cmd/...
 # Run tests
 go test ./...
 
-# Start infrastructure
-docker compose -f deployments/infrastructure.yml up -d
+# Start infrastructure + services (default choreography)
+docker compose up -d
 
-# Start services (pick one)
-docker compose -f deployments/choreography.yml up -d
-docker compose -f deployments/orchestration.yml up -d
+# Switch approach (choreography|orchestration)
+#   PowerShell: $env:APPROACH = "orchestration"; docker compose up -d
+#   bash:       APPROACH=orchestration docker compose up -d
 
-# Setup (topics + schemas)
+# Setup (Kafka topics)
 bash scripts/setup.sh
 
-# Reset (truncate DB + flush Redis)
+# Reset (truncate DB + flush Redis + fault counters)
 bash scripts/reset.sh
 
-# Run scenario (30 iterations)
-bash scripts/run-scenario.sh <S1|S2|S3|S4|S5|S6|S7> <choreography|orchestration>
+# Run scenario (30 iterations) - Windows PowerShell
+.\scripts\run-scenario.ps1 -Scenario <S1|S2|S3|S6|S7> -Approach <choreography|orchestration> -Runs 30
+
+# Run scenario (30 iterations) - bash with Go installed
+bash scripts/run-scenario.sh <S1|S2|S3|S6|S7> <choreography|orchestration> 30
 ```
 
 ## Conventions

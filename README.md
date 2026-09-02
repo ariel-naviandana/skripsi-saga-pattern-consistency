@@ -30,13 +30,13 @@ projek-skripsi/
 │   ├── postgres/           # pgxpool
 │   └── redis/              # go-redis
 ├── deployments/            # Docker Compose variants
-│   ├── infrastructure.yml  # Kafka, Redis, Prometheus, Grafana
-│   ├── choreography.yml    # Services wired for choreography
-│   └── orchestration.yml   # Services + Orchestrator
-├── scripts/                # Bash helpers
-│   ├── setup.sh            # Create topics + init DB
-│   ├── reset.sh            # Truncate DBs, flush Redis
-│   └── run-scenario.sh     # Parametric scenario runner
+│   ├── infrastructure.yml  # Kafka, Redis, Prometheus, Grafana, 4x PostgreSQL
+│   └── services.yml        # 4 services + orchestrator (APPROACH env)
+├── scripts/                # Helpers
+│   ├── setup.sh            # Create topics
+│   ├── reset.sh            # Truncate DBs, flush Redis, reset fault counters
+│   ├── run-scenario.sh     # Parametric scenario runner (bash/CI)
+│   └── run-scenario.ps1    # Parametric scenario runner (Windows PowerShell)
 ├── test/                   # Integration tests
 ├── docs/
 │   ├── ARCHITECTURE.md     # Diagrams & design choices
@@ -49,13 +49,27 @@ projek-skripsi/
 ## Quick Start
 
 ```powershell
-# Prerequisites: Docker Desktop, Go 1.21+, bash
-# (Windows: jalankan scripts via Git Bash or WSL)
-
-docker compose -f deployments/infrastructure.yml up -d   # Start infra
-bash scripts/setup.sh                                     # Topics + schemas
-docker compose -f deployments/choreography.yml up -d      # Start services
+# Prerequisites: Docker Desktop, Go 1.21+, bash (Windows: via WSL for scripts)
+docker compose up -d              # infra + services (default choreography)
+bash scripts/setup.sh             # create Kafka topics
 ```
+
+Setiap service membaca `APPROACH` (`choreography`/`orchestration`). Untuk
+berpindah pendekatan, set environment lalu `docker compose up -d`:
+
+```powershell
+$env:APPROACH = "orchestration"
+docker compose up -d order-service payment-service inventory-service shipping-service orchestrator
+```
+
+## Menjalankan Skenario
+
+```powershell
+.\scripts\run-scenario.ps1 -Scenario S1 -Approach choreography -Runs 30
+.\scripts\run-scenario.ps1 -Scenario S3 -Approach orchestration -Runs 30
+```
+
+Hasil JSON per iterasi tersimpan di `docs/runs/<Skenario>/<approach>/`.
 
 ## Scenarios
 

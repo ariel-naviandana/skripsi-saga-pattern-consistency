@@ -44,8 +44,6 @@ func main() {
 		resp, err := orch.Start(r.Context(), req)
 		if err != nil {
 			log.Printf("orchestrator: saga failed: %v", err)
-			common.JSON(w, http.StatusOK, orchestration.StartResponse{SagaID: resp.SagaID, Status: "compensated"})
-			return
 		}
 		common.JSON(w, http.StatusOK, resp)
 	})

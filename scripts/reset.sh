@@ -10,4 +10,9 @@ docker exec saga-shipping-db psql -U shipping_user -d shipping_db -c "TRUNCATE T
 echo "Flushing Redis (orchestrator state)..."
 docker exec saga-redis redis-cli FLUSHALL
 
+echo "Resetting fault injection counters..."
+for port in 8081 8082 8083 8084; do
+  curl -s -X POST "http://localhost:${port}/fault/reset" > /dev/null || true
+done
+
 echo "Reset complete."

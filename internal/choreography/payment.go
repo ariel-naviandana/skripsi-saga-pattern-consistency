@@ -25,7 +25,9 @@ func (s *PaymentService) Run(ctx context.Context) error {
 				return err
 			}
 			if err := s.Biz.ProcessPayment(ctx, ev.SagaID, ev.OrderID, ev.Amount); err != nil {
-				return err
+				return s.Pub.Publish(TopicPaymentFailed, ev.SagaID, PaymentResultEvent{
+					SagaID: ev.SagaID, OrderID: ev.OrderID, Amount: ev.Amount, Success: false,
+				})
 			}
 			return s.Pub.Publish(TopicPaymentProcessed, ev.SagaID, PaymentResultEvent{
 				SagaID: ev.SagaID, OrderID: ev.OrderID, Amount: ev.Amount, Success: true,

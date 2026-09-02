@@ -24,12 +24,10 @@ func (s *InventoryService) Run(ctx context.Context) error {
 			if err != nil {
 				return err
 			}
-			// Amount is not needed here; product comes from a lookup stored by the
-			// payment event's order. To keep the demo self-contained we re-derive
-			// the product from the order table of the order service, which is not
-			// shared here. For S1 baseline we use a fixed product id.
 			if err := s.Biz.ReserveInventory(ctx, ev.SagaID, "product-1", 1); err != nil {
-				return err
+				return s.Pub.Publish(TopicInventoryFailed, ev.SagaID, InventoryResultEvent{
+					SagaID: ev.SagaID, OrderID: ev.OrderID, ProductID: "product-1", Quantity: 1, Success: false,
+				})
 			}
 			return s.Pub.Publish(TopicInventoryReserved, ev.SagaID, InventoryResultEvent{
 				SagaID: ev.SagaID, OrderID: ev.OrderID, ProductID: "product-1", Quantity: 1, Success: true,

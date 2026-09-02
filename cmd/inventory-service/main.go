@@ -25,9 +25,10 @@ func main() {
 		log.Fatalf("inventory: init schema: %v", err)
 	}
 
-	biz := &business.InventoryService{Pool: pool}
+	biz := &business.InventoryService{Pool: pool, Fault: common.NewFaultConfig()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", common.HealthHandler("inventory"))
+	mux.HandleFunc("/fault/reset", common.FaultResetHandler(biz.Fault))
 
 	switch cfg.Approach {
 	case "orchestration":

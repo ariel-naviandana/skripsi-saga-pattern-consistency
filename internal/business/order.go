@@ -7,12 +7,14 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/ariel-naviandana/skripsi-saga-pattern-consistency/internal/common"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 // OrderService owns the order database. It is shared by both approaches.
 type OrderService struct {
-	Pool *pgxpool.Pool
+	Pool  *pgxpool.Pool
+	Fault *common.FaultConfig
 }
 
 // NewSagaID returns a random hex string used as the saga identifier.
@@ -28,6 +30,13 @@ func NewSagaID() string {
 // CreateOrder persists a new order and logs the committed step.
 // It returns the new order's id (as text) and the saga id.
 func (s *OrderService) CreateOrder(ctx context.Context, sagaID, customerID, productID string, quantity, amount int) (string, error) {
+	if s.Fault != nil {
+		s.Fault.Delay()
+		if s.Fault.ShouldFail("order", false) {
+			_ = writeLog(ctx, s.Pool, sagaID, "order", "failed", "injected")
+			return "", fmt.Errorf("business: injected order failure")
+		}
+	}
 	var orderID int64
 	err := s.Pool.QueryRow(ctx,
 		`INSERT INTO orders (saga_id, customer_id, product_id, quantity, amount, status)
@@ -45,6 +54,13 @@ func (s *OrderService) CreateOrder(ctx context.Context, sagaID, customerID, prod
 
 // CompensateOrder marks the order as compensated (rollback of CreateOrder).
 func (s *OrderService) CompensateOrder(ctx context.Context, sagaID string) error {
+	if s.Fault != nil {
+		s.Fault.Delay()
+		if s.Fault.ShouldFail("order", true) {
+			_ = writeLog(ctx, s.Pool, sagaID, "order", "compensate_failed", "injected")
+			return fmt.Errorf("business: injected order compensation failure")
+		}
+	}
 	if _, err := s.Pool.Exec(ctx,
 		`UPDATE orders SET status = 'compensated' WHERE saga_id = $1 AND status = 'committed'`,
 		sagaID,

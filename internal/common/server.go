@@ -42,3 +42,13 @@ func Serve(addr string, handler http.Handler) error {
 func Addr(port int) string {
 	return fmt.Sprintf(":%d", port)
 }
+
+// FaultResetHandler resets the fault attempt counter (called between runs).
+func FaultResetHandler(fc *FaultConfig) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if fc != nil {
+			fc.ResetAttempt()
+		}
+		JSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	}
+}

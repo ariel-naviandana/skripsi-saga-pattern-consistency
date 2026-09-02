@@ -21,7 +21,9 @@ func (s *ShippingService) Run(ctx context.Context) error {
 			return err
 		}
 		if err := s.Biz.ScheduleShipping(ctx, ev.SagaID, ev.OrderID); err != nil {
-			return err
+			return s.Pub.Publish(TopicShippingFailed, ev.SagaID, ShippingResultEvent{
+				SagaID: ev.SagaID, OrderID: ev.OrderID, Success: false,
+			})
 		}
 		return s.Pub.Publish(TopicShippingScheduled, ev.SagaID, ShippingResultEvent{
 			SagaID: ev.SagaID, OrderID: ev.OrderID, Success: true,

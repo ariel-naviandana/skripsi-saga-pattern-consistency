@@ -25,9 +25,10 @@ func main() {
 		log.Fatalf("payment: init schema: %v", err)
 	}
 
-	biz := &business.PaymentService{Pool: pool}
+	biz := &business.PaymentService{Pool: pool, Fault: common.NewFaultConfig()}
 	mux := http.NewServeMux()
 	mux.HandleFunc("/health", common.HealthHandler("payment"))
+	mux.HandleFunc("/fault/reset", common.FaultResetHandler(biz.Fault))
 
 	switch cfg.Approach {
 	case "orchestration":

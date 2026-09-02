@@ -83,23 +83,23 @@ func (o *Orchestrator) Start(ctx context.Context, req StartRequest) (StartRespon
 
 	orderResp, err := o.call(ctx, http.MethodPost, o.OrderURL+"/orders/process", step)
 	if err != nil {
-		return StartResponse{}, o.fail(ctx, sagaID, fmt.Errorf("order: %w", err))
+		return StartResponse{SagaID: sagaID, Status: "compensated"}, o.fail(ctx, sagaID, fmt.Errorf("order: %w", err))
 	}
 	step.OrderID = orderResp.OrderID
 	o.saveState(ctx, sagaID, "payment")
 
 	if _, err := o.call(ctx, http.MethodPost, o.PaymentURL+"/payments", step); err != nil {
-		return StartResponse{}, o.fail(ctx, sagaID, fmt.Errorf("payment: %w", err))
+		return StartResponse{SagaID: sagaID, Status: "compensated"}, o.fail(ctx, sagaID, fmt.Errorf("payment: %w", err))
 	}
 	o.saveState(ctx, sagaID, "inventory")
 
 	if _, err := o.call(ctx, http.MethodPost, o.InventoryURL+"/inventory", step); err != nil {
-		return StartResponse{}, o.fail(ctx, sagaID, fmt.Errorf("inventory: %w", err))
+		return StartResponse{SagaID: sagaID, Status: "compensated"}, o.fail(ctx, sagaID, fmt.Errorf("inventory: %w", err))
 	}
 	o.saveState(ctx, sagaID, "shipping")
 
 	if _, err := o.call(ctx, http.MethodPost, o.ShippingURL+"/shipments", step); err != nil {
-		return StartResponse{}, o.fail(ctx, sagaID, fmt.Errorf("shipping: %w", err))
+		return StartResponse{SagaID: sagaID, Status: "compensated"}, o.fail(ctx, sagaID, fmt.Errorf("shipping: %w", err))
 	}
 	o.saveState(ctx, sagaID, "committed")
 
