@@ -1,32 +1,20 @@
-version: "3.9"
-
 services:
-  zookeeper:
-    image: bitnami/zookeeper:3.9
-    container_name: saga-zookeeper
-    environment:
-      ALLOW_ANONYMOUS_LOGIN: "yes"
-    ports:
-      - "2181:2181"
-    networks:
-      - saga-infra
-
   kafka:
-    image: bitnami/kafka:3.7
+    image: apache/kafka:latest
     container_name: saga-kafka
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      ALLOW_PLAINTEXT_LISTENER: "yes"
-      KAFKA_LISTENERS: PLAINTEXT://:9092,EXTERNAL://:9094
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,EXTERNAL://:9094,CONTROLLER://:9093
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://saga-kafka:9092,EXTERNAL://localhost:9094
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: EXTERNAL:PLAINTEXT,PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
     ports:
       - "9092:9092"
       - "9094:9094"
-    depends_on:
-      - zookeeper
     networks:
       - saga-infra
 
@@ -88,7 +76,7 @@ services:
       - saga-infra
 
   prometheus:
-    image: prom/prometheus:v2.52
+    image: prom/prometheus:latest
     container_name: saga-prometheus
     volumes:
       - ../deployments/prometheus.yml:/etc/prometheus/prometheus.yml:ro
@@ -98,7 +86,7 @@ services:
       - saga-infra
 
   grafana:
-    image: grafana/grafana:10.4
+    image: grafana/grafana:latest
     container_name: saga-grafana
     environment:
       GF_SECURITY_ADMIN_PASSWORD: admin
