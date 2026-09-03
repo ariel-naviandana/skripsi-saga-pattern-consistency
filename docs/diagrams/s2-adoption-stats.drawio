@@ -1,0 +1,61 @@
+<mxfile host="app.diagrams.net" modified="2026-01-01T00:00:00.000Z" agent="opencode" version="24.0.0" type="device">
+  <diagram name="S2-AdoptionStats" id="s2-adoption-stats">
+    <mxGraphModel dx="1100" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="500" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <!-- Card 1 -->
+        <mxCell id="card1" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="100" y="120" width="400" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="num1" value="74%" style="text;html=1;fontSize=72;fontStyle=1;align=center;verticalAlign=middle;fontColor=#17406d;" vertex="1" parent="1">
+          <mxGeometry x="140" y="150" width="320" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl1a" value="organisasi mengadopsi" style="text;html=1;fontSize=18;align=center;verticalAlign=middle;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="140" y="250" width="320" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl1b" value="microservices architecture" style="text;html=1;fontSize=16;align=center;verticalAlign=middle;fontColor=#0070c0;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="140" y="286" width="320" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="src1" value="Gartner, 2023" style="text;html=1;fontSize=14;align=center;verticalAlign=middle;fontColor=#595959;" vertex="1" parent="1">
+          <mxGeometry x="140" y="324" width="320" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- Card 2 -->
+        <mxCell id="card2" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="600" y="120" width="400" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="num2" value="77%" style="text;html=1;fontSize=72;fontStyle=1;align=center;verticalAlign=middle;fontColor=#17406d;" vertex="1" parent="1">
+          <mxGeometry x="640" y="150" width="320" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl2a" value="tingkat adopsi" style="text;html=1;fontSize=18;align=center;verticalAlign=middle;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="640" y="250" width="320" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl2b" value="microservices" style="text;html=1;fontSize=16;align=center;verticalAlign=middle;fontColor=#0070c0;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="640" y="286" width="320" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="src2" value="O'Reilly, 2020" style="text;html=1;fontSize=14;align=center;verticalAlign=middle;fontColor=#595959;" vertex="1" parent="1">
+          <mxGeometry x="640" y="324" width="320" height="24" as="geometry" />
+        </mxCell>
+
+        <!-- Card 3 -->
+        <mxCell id="card3" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="1100" y="120" width="400" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="num3" value="92%" style="text;html=1;fontSize=72;fontStyle=1;align=center;verticalAlign=middle;fontColor=#17406d;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="150" width="320" height="90" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl3a" value="merasakan" style="text;html=1;fontSize=18;align=center;verticalAlign=middle;fontColor=#000000;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="250" width="320" height="30" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl3b" value="sukses dengan microservices" style="text;html=1;fontSize=16;align=center;verticalAlign=middle;fontColor=#0070c0;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="286" width="320" height="26" as="geometry" />
+        </mxCell>
+        <mxCell id="src3" value="O'Reilly, 2020" style="text;html=1;fontSize=14;align=center;verticalAlign=middle;fontColor=#595959;" vertex="1" parent="1">
+          <mxGeometry x="1140" y="324" width="320" height="24" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

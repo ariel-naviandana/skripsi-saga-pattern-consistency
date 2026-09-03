@@ -1,0 +1,33 @@
+<mxfile host="app.diagrams.net" modified="2026-01-01T00:00:00.000Z" agent="opencode" version="24.0.0" type="device">
+  <diagram name="Agenda" id="agenda">
+    <mxGraphModel dx="1200" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="500" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="s1" value="1&#10;Latar Belakang" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;fontSize=18;fontColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="120" y="190" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="s2" value="2&#10;Landasan Teori" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;fontSize=18;fontColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="190" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="s3" value="3&#10;Metodologi" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;fontSize=18;fontColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="840" y="190" width="240" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="s4" value="4&#10;Rencana &amp; Target" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#17406d;strokeWidth=3;fontSize=18;fontColor=#17406d;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1200" y="190" width="240" height="120" as="geometry" />
+        </mxCell>
+
+        <mxCell id="a1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0070c0;strokeWidth=3;fontSize=18;" edge="1" parent="1" source="s1" target="s2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0070c0;strokeWidth=3;fontSize=18;" edge="1" parent="1" source="s2" target="s3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="a3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0070c0;strokeWidth=3;fontSize=18;" edge="1" parent="1" source="s3" target="s4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

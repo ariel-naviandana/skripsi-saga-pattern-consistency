@@ -1,0 +1,75 @@
+<mxfile host="app.diagrams.net" modified="2026-01-01T00:00:00.000Z" agent="opencode" version="24.0.0" type="device">
+  <diagram name="SagaPattern" id="saga-pattern">
+    <mxGraphModel dx="1200" dy="650" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="750" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="stitle" value="Saga Pattern: Transaksi Local + Compensating" style="text;html=1;fontSize=20;fontStyle=1;align=center;fontColor=#17406d;" vertex="1" parent="1">
+          <mxGeometry x="400" y="40" width="700" height="40" as="geometry" />
+        </mxCell>
+
+        <!-- Forward steps -->
+        <mxCell id="order" value="Order" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;fontSize=16;fontColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="200" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="payment" value="Payment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;fontSize=16;fontColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="200" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="inventory" value="Inventory" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;fontSize=16;fontColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="200" width="180" height="70" as="geometry" />
+        </mxCell>
+        <mxCell id="shipping" value="Shipping" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;fontSize=16;fontColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="200" width="180" height="70" as="geometry" />
+        </mxCell>
+
+        <mxCell id="f1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0070c0;strokeWidth=3;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="order" target="payment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0070c0;strokeWidth=3;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="payment" target="inventory">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="f3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0070c0;strokeWidth=3;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="inventory" target="shipping">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="fwdlabel" value="transaksi lokal (maju)" style="text;html=1;fontSize=13;align=center;fontColor=#0070c0;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="460" y="150" width="520" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- Compensation reverse -->
+        <mxCell id="cShp" value="Compensate Shipping" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#C00000;strokeWidth=3;dashed=1;fontSize=14;fontColor=#C00000;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="500" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="cInv" value="Compensate Inventory" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#C00000;strokeWidth=3;dashed=1;fontSize=14;fontColor=#C00000;" vertex="1" parent="1">
+          <mxGeometry x="760" y="500" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="cPay" value="Compensate Payment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#C00000;strokeWidth=3;dashed=1;fontSize=14;fontColor=#C00000;" vertex="1" parent="1">
+          <mxGeometry x="480" y="500" width="180" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="cOrd" value="Compensate Order" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#C00000;strokeWidth=3;dashed=1;fontSize=14;fontColor=#C00000;" vertex="1" parent="1">
+          <mxGeometry x="200" y="500" width="180" height="60" as="geometry" />
+        </mxCell>
+
+        <mxCell id="r1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#C00000;strokeWidth=3;dashed=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="cShp" target="cInv">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r2" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#C00000;strokeWidth=3;dashed=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="cInv" target="cPay">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="r3" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#C00000;strokeWidth=3;dashed=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;" edge="1" parent="1" source="cPay" target="cOrd">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="revlabel" value="compensating transaction (mundur, jika gagal)" style="text;html=1;fontSize=13;align=center;fontColor=#C00000;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="400" y="620" width="700" height="26" as="geometry" />
+        </mxCell>
+
+        <!-- Vertical connectors forward->reverse -->
+        <mxCell id="v1" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#C00000;strokeWidth=2;dashed=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" parent="1" source="shipping" target="cShp">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

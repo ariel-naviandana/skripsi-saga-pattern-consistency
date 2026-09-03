@@ -1,0 +1,41 @@
+<mxfile host="app.diagrams.net" modified="2026-01-01T00:00:00.000Z" agent="opencode" version="24.0.0" type="device">
+  <diagram name="Choreography" id="choreography">
+    <mxGraphModel dx="1200" dy="600" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1500" pageHeight="650" background="#ffffff" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+
+        <mxCell id="title" value="Choreography — koordinasi via event, tanpa koordinator" style="text;html=1;fontSize=20;fontStyle=1;align=center;fontColor=#17406d;" vertex="1" parent="1">
+          <mxGeometry x="380" y="40" width="740" height="40" as="geometry" />
+        </mxCell>
+
+        <mxCell id="order" value="Order&#10;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;fontSize=16;fontColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="200" y="260" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="payment" value="Payment&#10;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;fontSize=16;fontColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="480" y="260" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="inventory" value="Inventory&#10;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;fontSize=16;fontColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="760" y="260" width="180" height="80" as="geometry" />
+        </mxCell>
+        <mxCell id="shipping" value="Shipping&#10;Service" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#0070c0;strokeWidth=3;fontSize=16;fontColor=#000000;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="1040" y="260" width="180" height="80" as="geometry" />
+        </mxCell>
+
+        <mxCell id="e1" value="order.created" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0070c0;strokeWidth=3;fontSize=13;fontColor=#0070c0;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="order" target="payment">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e2" value="payment.processed" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0070c0;strokeWidth=3;fontSize=13;fontColor=#0070c0;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="payment" target="inventory">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e3" value="inventory.reserved" style="edgeStyle=orthogonalEdgeStyle;rounded=1;html=1;strokeColor=#0070c0;strokeWidth=3;fontSize=13;fontColor=#0070c0;exitX=1;exitY=0.5;entryX=0;entryY=0.5;" edge="1" parent="1" source="inventory" target="shipping">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+
+        <mxCell id="note" value="setiap service memublikasikan &amp; merespons event" style="text;html=1;fontSize=14;align=center;fontColor=#000000;fontStyle=2;" vertex="1" parent="1">
+          <mxGeometry x="400" y="170" width="700" height="30" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
