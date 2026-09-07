@@ -3,8 +3,10 @@ package consistency
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/ariel-naviandana/skripsi-saga-pattern-consistency/pkg/postgres"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -65,46 +67,41 @@ func (c *Checker) Close() {
 	c.shippingDB.Close()
 }
 
-func statusOf(ctx context.Context, pool *pgxpool.Pool, table string) (map[string]string, error) {
-	rows, err := pool.Query(ctx, fmt.Sprintf(`SELECT saga_id, status FROM %s`, table))
+func statusOf(ctx context.Context, pool *pgxpool.Pool, table, sagaID string) (string, error) {
+	var status string
+	err := pool.QueryRow(ctx,
+		fmt.Sprintf(`SELECT status FROM %s WHERE saga_id = $1`, table), sagaID).Scan(&status)
+	if err == pgx.ErrNoRows {
+		return "", nil
+	}
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	defer rows.Close()
-	out := map[string]string{}
-	for rows.Next() {
-		var sagaID, status string
-		if err := rows.Scan(&sagaID, &status); err != nil {
-			return nil, err
-		}
-		out[sagaID] = status
-	}
-	return out, nil
+	return status, nil
 }
 
-// sagaLogFlags returns, per saga_id, whether a forward failure and/or a
+// sagaLogFlags returns, for one saga, whether a forward failure and/or a
 // compensation failure was recorded in saga_log.
-func sagaLogFlags(ctx context.Context, pool *pgxpool.Pool) (failed map[string]bool, compFailed map[string]bool, err error) {
-	failed = map[string]bool{}
-	compFailed = map[string]bool{}
-	rows, err := pool.Query(ctx, `SELECT saga_id, status FROM saga_log`)
+func sagaLogFlags(ctx context.Context, pool *pgxpool.Pool, sagaID string) (failed, compFailed bool, err error) {
+	rows, err := pool.Query(ctx,
+		`SELECT status FROM saga_log WHERE saga_id = $1`, sagaID)
 	if err != nil {
-		return nil, nil, err
+		return false, false, err
 	}
 	defer rows.Close()
 	for rows.Next() {
-		var sagaID, status string
-		if err := rows.Scan(&sagaID, &status); err != nil {
-			return nil, nil, err
+		var status string
+		if err := rows.Scan(&status); err != nil {
+			return false, false, err
 		}
 		switch status {
 		case "failed":
-			failed[sagaID] = true
+			failed = true
 		case "compensate_failed":
-			compFailed[sagaID] = true
+			compFailed = true
 		}
 	}
-	return failed, compFailed, nil
+	return failed, compFailed, rows.Err()
 }
 
 // SagaOutcome classifies the final state of a saga across all services.
@@ -117,6 +114,65 @@ const (
 	OutcomeNotFound     SagaOutcome = "not_found"
 )
 
+// Timeline returns the failure detection time, the final state time, and the
+// first recorded time of a saga, based on saga_log timestamps across all four
+// service databases.
+//
+// detection is the created_at of the first saga_log row with status "failed"
+// (recorded by the fault injection middleware when the failure is triggered);
+// final is the latest saga_log timestamp overall (the moment the last state
+// change was confirmed); first is the earliest saga_log timestamp (when the
+// saga started). Zero times are returned when the saga has no such row.
+func (c *Checker) Timeline(ctx context.Context, sagaID string) (detection, final, first time.Time, err error) {
+	pools := []*pgxpool.Pool{c.orderDB, c.paymentDB, c.inventoryDB, c.shippingDB}
+	for _, pool := range pools {
+		rows, err := pool.Query(ctx,
+			`SELECT created_at, status FROM saga_log WHERE saga_id = $1 ORDER BY created_at`, sagaID)
+		if err != nil {
+			return time.Time{}, time.Time{}, time.Time{}, fmt.Errorf("consistency: timeline %s: %w", sagaID, err)
+		}
+		for rows.Next() {
+			var ts time.Time
+			var status string
+			if err := rows.Scan(&ts, &status); err != nil {
+				rows.Close()
+				return time.Time{}, time.Time{}, time.Time{}, err
+			}
+			if status == "failed" && (detection.IsZero() || ts.Before(detection)) {
+				detection = ts
+			}
+			if first.IsZero() || ts.Before(first) {
+				first = ts
+			}
+			if final.IsZero() || ts.After(final) {
+				final = ts
+			}
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return time.Time{}, time.Time{}, time.Time{}, err
+		}
+	}
+	return detection, final, first, nil
+}
+
+// Sealed reports whether the saga recorded a compensating failure. A
+// compensate_failed marker means the saga's fate is final: the compensation
+// chain failed and no retry mechanism exists, so waiting for quiescence
+// before classifying it is unnecessary.
+func (c *Checker) Sealed(ctx context.Context, sagaID string) (bool, error) {
+	for _, pool := range []*pgxpool.Pool{c.orderDB, c.paymentDB, c.inventoryDB, c.shippingDB} {
+		_, compFailed, err := sagaLogFlags(ctx, pool, sagaID)
+		if err != nil {
+			return false, err
+		}
+		if compFailed {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
 // Check returns the consistency outcome for one saga id.
 //
 // A service "participates" in a saga if it has a row in its business table.
@@ -126,38 +182,38 @@ const (
 //   - compensated: every participating service is compensated
 //   - inconsistent: a mix of committed/compensated, or a residual non-final state
 func (c *Checker) Check(ctx context.Context, sagaID string) (SagaOutcome, error) {
-	order, err := statusOf(ctx, c.orderDB, "orders")
+	order, err := statusOf(ctx, c.orderDB, "orders", sagaID)
 	if err != nil {
 		return "", fmt.Errorf("consistency: orders: %w", err)
 	}
-	payment, err := statusOf(ctx, c.paymentDB, "payments")
+	payment, err := statusOf(ctx, c.paymentDB, "payments", sagaID)
 	if err != nil {
 		return "", fmt.Errorf("consistency: payments: %w", err)
 	}
-	inventory, err := statusOf(ctx, c.inventoryDB, "inventory")
+	inventory, err := statusOf(ctx, c.inventoryDB, "inventory", sagaID)
 	if err != nil {
 		return "", fmt.Errorf("consistency: inventory: %w", err)
 	}
-	shipping, err := statusOf(ctx, c.shippingDB, "shipments")
+	shipping, err := statusOf(ctx, c.shippingDB, "shipments", sagaID)
 	if err != nil {
 		return "", fmt.Errorf("consistency: shipments: %w", err)
 	}
 
 	statuses := []string{
-		order[sagaID],
-		payment[sagaID],
-		inventory[sagaID],
-		shipping[sagaID],
+		order,
+		payment,
+		inventory,
+		shipping,
 	}
 
 	// Gather intent flags from saga_log across services.
 	cf := false
 	for _, pool := range []*pgxpool.Pool{c.orderDB, c.paymentDB, c.inventoryDB, c.shippingDB} {
-		_, compFailed, err := sagaLogFlags(ctx, pool)
+		_, compFailed, err := sagaLogFlags(ctx, pool, sagaID)
 		if err != nil {
 			return "", err
 		}
-		if compFailed[sagaID] {
+		if compFailed {
 			cf = true
 		}
 	}

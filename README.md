@@ -69,6 +69,14 @@ docker compose up -d order-service payment-service inventory-service shipping-se
 .\scripts\run-scenario.ps1 -Scenario S3 -Approach orchestration -Runs 30
 ```
 
+Skenario crash (S4/S5) otomatis — stop container di tengah transaksi
+(`DELAY_MS=3000` menciptakan window crash deterministik):
+
+```powershell
+.\scripts\run-crash.ps1 -Scenario S4 -Runs 10
+.\scripts\run-crash.ps1 -Scenario S5 -Runs 10
+```
+
 Hasil JSON per iterasi tersimpan di `docs/runs/<Skenario>/<approach>/`.
 
 ## Scenarios
@@ -89,8 +97,13 @@ Detail: [docs/SCENARIOS.md](docs/SCENARIOS.md)
 
 - **Consistency Rate** (primary): % of transactions ending in consistent state across services
 - **Compensating Tx Success Rate**: % of compensating transactions executed fully
-- **Recovery Time**: time from failure detection → final state consistency
+- **Recovery Time**: from failure detection → final state consistency, computed
+  from `saga_log` timestamps (proposal 3.5.3)
+- **Inconsistency window**: transient inconsistency period per saga (first →
+  last `saga_log` write, proposal 3.7)
 - **Throughput / Latency**: comparative performance (secondary)
+
+Agregasi + statistik deskriptif (mean/min/max/std) via `go run ./cmd/analyze`.
 
 ## Tech Stack
 

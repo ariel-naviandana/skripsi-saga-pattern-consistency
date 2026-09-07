@@ -60,6 +60,24 @@ curl -s -X POST http://localhost:8080/saga -H 'Content-Type: application/json' -
 docker stop saga-orchestrator
 ```
 
+## Skenario S4 dan S5 (otomatis)
+
+Dijalankan otomatis via `scripts/run-crash.ps1` (10+ iterasi):
+
+```powershell
+# S4 - Orchestrator Crash (orchestration): stop orchestrator setelah order+payment
+#      commit, saat langkah inventory sedang berjalan (DELAY_MS=3000 menciptakan
+#      window crash deterministik, proposal 3.4.1)
+.\scripts\run-crash.ps1 -Scenario S4 -Runs 10
+
+# S5 - Kafka Down (choreography): stop Kafka setelah order commit, rantai event
+#      terputus sebelum payment/inventory/shipping
+.\scripts\run-crash.ps1 -Scenario S5 -Runs 10
+```
+
+Hasil verifikasi (10 run): S4 dan S5 keduanya **10/10 inconsistent** (commit
+parsial) — lihat `docs/runs/S4/orchestration/` dan `docs/runs/S5/choreography/`.
+
 ## Reset antar Run
 
 `scripts/reset.sh` mengosongkan semua tabel bisnis + `saga_log` di 4 database,
@@ -88,12 +106,24 @@ File mentah disimpan di `docs/runs/` (git-ignored).
 
 ## Ringkasan Hasil Verifikasi (implementasi)
 
+Data lengkap: [docs/REPORT.md](REPORT.md) dan `docs/runs/summary.json`.
+
 | Skenario | Choreography | Orchestration |
 |----------|--------------|---------------|
-| S1 | committed | committed |
-| S2 | compensated | compensated |
-| S3 | compensated | compensated |
-| S6 | inconsistent | inconsistent |
-| S7 (500) | committed (dengan polling settle) | committed |
+| S1 | committed (100%) | committed (100%) |
+| S2 | compensated (100%) | compensated (100%) |
+| S3 | compensated (100%) | compensated (100%) |
+| S6 | inconsistent (100%) | inconsistent (100%) |
+| S7 (500×30) | committed (100%, 15000/15000) | committed (100%, 14998/15000; 2 request unrecorded) |
 | S4 | — | inconsistent (partial, manual) |
 | S5 | inconsistent (partial, manual) | — |
+
+### Metrik tambahan (kode final)
+
+- **Recovery time** (deteksi kegagalan → final konsisten): setara antar
+  pendekatan — S2: 22 vs 25 ms, S3: 18 vs 31 ms.
+- **Periode inkonsistensi sementara** (saga_log pertama → terakhir): setara pada
+  beban rendah (±31–49 ms); pada S7 choreography ±6238 ms vs orchestration
+  ±864 ms (rantai Kafka serial).
+- Latency end-to-end: orchestration lebih rendah pada S2/S3/S7; perbedaan
+  berasal dari jalur eksekusi, bukan kecepatan pemulihan.

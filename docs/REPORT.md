@@ -1,104 +1,150 @@
 # Laporan Hasil Eksperimen
 
-Laporan awal hasil eksperimen skenario S1–S7 untuk pendekatan **choreography**
+Laporan hasil eksperimen skenario S1–S7 untuk pendekatan **choreography**
 dan **orchestration**. Data mentah per iterasi tersimpan di `docs/runs/` dan
 agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 
 ## Metodologi Ringkas
 
-- 4 service (Order, Payment, Inventory, Shipping), database-per-service (PostgreSQL).
-- Choreography: koordinasi via Apache Kafka (event-based).
+- 4 service (Order, Payment, Inventory, Shipping), database-per-service (PostgreSQL 15).
+- Choreography: koordinasi via Apache Kafka (event-based, 8 topik, partisi tunggal).
 - Orchestration: koordinasi via Saga Orchestrator (HTTP request-reply) + state di Redis.
-- Setiap skenario diulang **30 iterasi**, di antara iterasi dilakukan reset penuh
+- Setiap skenario diulang **30 iterasi**; di antara iterasi dilakukan reset penuh
   (truncate DB, flush Redis, reset counter fault).
-- Metrik: **Consistency Rate**, **Compensating Transaction Success Rate**,
-  dan latensi hingga final state (proksi *recovery time*).
+- Metrik (sesuai proposal 3.5): **Consistency Rate**, **Compensating Transaction
+  Success Rate (CTSR)**, **Recovery Time** (deteksi kegagalan → final state
+  konsisten, dari timestamp `saga_log`), plus **periode inkonsistensi sementara**
+  (saga_log pertama → terakhir, proposal 3.7) dan latency end-to-end.
+- Statistik deskriptif per skenario: rata-rata, min, max, standar deviasi (proposal 3.7).
 
-## Hasil Agregat (30 iterasi)
+## Hasil Agregat (30 iterasi, kode final)
 
-| Skenario | Approach | Txns | Committed | Compensated | Inconsistent | Consistency% | CompSuccess% | AvgLatency (ms) |
-|----------|----------|------|-----------|-------------|--------------|--------------|--------------|-----------------|
-| S1 | choreography | 30 | 30 | 0 | 0 | 100.0 | — | 228 |
-| S1 | orchestration | 30 | 30 | 0 | 0 | 100.0 | — | 107 |
-| S2 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 600 |
-| S2 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 132 |
-| S3 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 588 |
-| S3 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 110 |
-| S6 | choreography | 30 | 0 | 0 | 30 | 0.0 | 0.0 | 1100 |
-| S6 | orchestration | 30 | 0 | 0 | 30 | 0.0 | 0.0 | 1140 |
-| S7 | choreography | 15000 | 14889 | 0 | 111 | 99.3 | — | 10300 |
-| S7 | orchestration | 15000 | 14948 | 0 | 52* | 99.7 | — | 6942 |
+### Skenario 1 transaksi (S1, S2, S3, S6)
 
-\* Pada S7 orchestration, 52 transaksi gagal terkirim (request error di bawah
-beban) sehingga tidak tercatat pada status akhir; dihitung sebagai tidak
-konsisten terhadap total transaksi.
+| Skenario | Approach | Txns | Committed | Compensated | Inconsistent | Consistency% | CTSR% | Recovery (ms) | Inconsistency window (ms) | Latency (ms) |
+|----------|----------|------|-----------|-------------|--------------|--------------|-------|---------------|---------------------------|--------------|
+| S1 | choreography | 30 | 30 | 0 | 0 | 100.0 | — | — | 31 | 165 |
+| S1 | orchestration | 30 | 30 | 0 | 0 | 100.0 | — | — | 31 | 154 |
+| S2 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 22 | 48 | 1639 |
+| S2 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 25 | 49 | 160 |
+| S3 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 18 | 37 | 1670 |
+| S3 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 31 | 49 | 173 |
+| S6 | choreography | 30 | 0 | 0 | 30 | 0.0 | 0.0 | — | 25 | 129 |
+| S6 | orchestration | 30 | 0 | 0 | 30 | 0.0 | 0.0 | — | 50 | 188 |
+
+### Skenario konkurensi (S7, 500 transaksi/iterasi → 15.000 transaksi total)
+
+| Skenario | Approach | Txns | Committed | Unrecorded* | Consistency% | Inconsistency window (ms) | Latency (ms) |
+|----------|----------|------|-----------|-------------|--------------|---------------------------|--------------|
+| S7 | choreography | 15000 | 15000 | 0 | 100.0 | 6238 | 9722 |
+| S7 | orchestration | 15000 | 14998 | 2 | 100.0 | 864 | 5241 |
+
+\* Unrecorded = request yang gagal terkirim/mendapat respons di pintu masuk saat
+puncak beban (koneksi diputus paksa); transaksi tidak pernah dimulai, bukan
+inkonsistensi data.
 
 ## Analisis per Skenario
 
 ### S1 — Baseline Normal
-Kedua pendekatan mencapai konsistensi penuh (100%). Orchestration lebih cepat
-(latensi ±107 ms vs ±228 ms) karena alur sinkron tanpa antrian broker.
+Kedua pendekatan konsisten penuh (100%). Periode inkonsistensi sementara
+identik (±31 ms) dan latency seimbang (±165 vs ±154 ms).
 
 ### S2 — Kegagalan Shipping (langkah akhir)
-Kompensasi berantai berhasil penuh di kedua pendekatan (CompSuccess 100%).
-Orchestration menyelesaikan kompensasi lebih cepat (±132 ms vs ±600 ms) karena
-mekanisme request-reply langsung, sedangkan choreography mengikuti propagasi
-event antar service (beberapa hop Kafka).
+Kompensasi berantai berhasil penuh di kedua pendekatan (CTSR 100%).
+**Recovery time setara** (±22 vs ±25 ms) — mekanisme pemulihan sama cepatnya.
+Perbedaan latency end-to-end (±1639 vs ±160 ms) berasal dari jalur eksekusi
+forward choreography yang melewati beberapa hop Kafka, bukan dari kecepatan
+pemulihan.
 
 ### S3 — Kegagalan Inventory (langkah tengah)
-Pola sama dengan S2: kompensasi penuh (100%), orchestration lebih cepat
-(±110 ms vs ±588 ms). Kegagalan di tengah rantai menghasilkan kompensasi pada
-Order dan Payment; Inventory dan Shipping tidak berpartisipasi.
+Pola sama dengan S2: kompensasi penuh (100%), **recovery time setara** bahkan
+sedikit lebih cepat di choreography (±18 vs ±31 ms). Periode inkonsistensi
+sementara juga setara (±37 vs ±49 ms).
 
 ### S6 — Kegagalan Compensating Transaction
-Kedua pendekatan **tidak** dapat mengembalikan konsistensi (0%). Ini wajar:
-jika operasi kompensasi itu sendiri gagal, data tertinggal pada status parsial
-(Order/Payment tetap `committed`). Temuan ini menyoroti pentingnya mekanisme
-kompensasi yang idempoten + retry. Waktu hingga kondisi tidak konsisten
-terkonfirmasi serupa (±1,1 s) di kedua pendekatan.
+Kedua pendekatan **tidak** dapat memulihkan konsistensi (0%). Compensating
+transaction yang gagal (marker `compensate_failed` di `saga_log`) tidak memiliki
+mekanisme retry di kedua pendekatan, sehingga data tertinggal pada status
+parsial permanen. Temuan ini menyoroti pentingnya idempotensi + retry pada
+compensating transaction.
 
 ### S7 — Konkurensi 500 Transaksi
-Di bawah beban, keduanya tetap menjaga konsistensi tinggi (≥99%). Choreography
-sedikit lebih rendah (99.3%) karena sifat asinkron: beberapa saga belum settle
-dalam jendela polling. Orchestration menunjukkan latensi rata-rata lebih rendah
-(±6.9 s vs ±10.3 s) tetapi terdapat 52 request error — menandakan orchestrator
-sebagai titik tunggal yang dapat jenuh saat beban puncak.
+Hasil setelah perbaikan metodologi pengukuran (deteksi quiescence berbasis
+`created_at` `saga_log`): **kedua pendekatan 100% konsisten** untuk seluruh
+transaksi yang diproses. Perbedaan utama:
+- **Periode inkonsistensi sementara**: choreography ±6238 ms vs orchestration
+  ±864 ms — ±7× lebih lama. Rantai event Kafka dengan partisi tunggal
+  mengantri 500 transaksi secara serial, sehingga transaksi terakhir berada
+  dalam kondisi parsial selama beberapa detik.
+- **Latency end-to-end**: choreography ±9722 ms vs orchestration ±5241 ms.
+- **Availability pintu masuk**: choreography memproses seluruh 15.000 transaksi;
+  orchestration kehilangan 2 request (0.01%) saat puncak beban karena entry
+  point tunggalnya (orchestrator + port forward) menolak koneksi.
 
-## Observasi S4 & S5 (dijalankan manual)
+## Observasi S4 & S5 (otomatis, 10 run)
 
-- **S4 — Orchestrator Crash**: transaksi terpotong di tengah → commit parsial
-  (misal Order + Payment `committed`) tanpa kompensasi → **inkonsisten**. Crash
-  di awal (sebelum commit pertama) tidak meninggalkan efek pada data bisnis,
-  hanya sisa state di Redis.
-- **S5 — Kafka Down**: event `order.created` tidak sampai ke service berikutnya
-  → Order `committed`, Payment/Inventory/Shipping tidak berpartisipasi →
-  **inkonsisten** (saga tidak pernah selesai).
+Dijalankan dengan `scripts/run-crash.ps1`; `DELAY_MS=3000` diset untuk
+menciptakan window crash yang deterministik (saga berjalan ~3 s per langkah,
+sehingga komponen dapat dihentikan saat transaksi masih berlangsung; tanpa
+delay, saga selesai dalam ±100 ms lebih cepat dari latency `docker stop`).
+
+- **S4 — Orchestrator Crash** (10 run): **10/10 inconsistent**. Pola konsisten:
+  Order dan Payment `committed`, Inventory/Shipping tidak berpartisipasi —
+  orchestrator dihentikan saat langkah inventory masih berjalan, sehingga
+  kompensasi mundur tidak pernah dieksekusi. Commit parsial permanen.
+- **S5 — Kafka Down** (10 run): **10/10 inconsistent**. Order `committed`;
+  Payment kadang `committed` (jika event sempat dikonsumsi sebelum broker mati)
+  atau tidak berpartisipasi; Inventory/Shipping tidak pernah berpartisipasi —
+  rantai event terputus tanpa mekanisme replay, saga tidak pernah selesai.
+
+Kedua skenario mengonfirmasi temuan utama: kegagalan komponen koordinasi
+(orchestrator / broker) mengakibatkan **commit parsial tanpa kompensasi** di
+pendekatan masing-masing.
 
 ## Perbandingan & Rekomendasi
 
-1. **Konsistensi**: dalam skenario kegagalan langkah (S2/S3) kedua pendekatan
-   sama-sama mampu mengembalikan konsistensi. Perbedaan tidak muncul pada
-   *apakah* konsisten, melainkan pada *seberapa cepat* pemulihan.
-2. **Recovery speed**: orchestration konsisten lebih cepat pada kegagalan
-   langkah (S2/S3) dan beban normal (S1) karena koordinasi sinkron.
-3. **Skalabilitas & titik tunggal**: orchestration lebih cepat namun
-   rentan terhadap kegagalan/kebanjiran orchestrator (S4, S7 request error).
-   Choreography lebih tahan terhadap kegagalan titik pusat namun lebih lambat
-   dan membutuhkan settle time pada beban tinggi.
-4. **Kegagalan kompensasi (S6)**: tidak ada pendekatan yang unggul; keduanya
-   membutuhkan idempotensi + retry pada compensating transaction agar robust.
+1. **Konsistensi data (RM1)**: kedua pendekatan **setara** — keduanya 100%
+   konsisten pada semua skenario yang dapat pulih (S1/S2/S3/S7) dan keduanya
+   0% saat kompensasi gagal (S6). Tidak ada pendekatan yang lebih unggul dalam
+   menjaga konsistensi akhir.
+2. **Compensating transaction success rate (RM2)**: setara (100% pada S2/S3,
+   0% pada S6). Kelemahan saga terletak pada compensating transaction itu
+   sendiri, bukan pada mekanisme koordinasi.
+3. **Recovery time (RM3)**: setara (±18–31 ms) pada kegagalan langkah.
+   Klaim awal "orchestration 4–5× lebih cepat pulih" tidak terdukung ketika
+   recovery time diukur sesuai definisi (deteksi kegagalan → final konsisten);
+   perbedaan latency yang besar justru berasal dari jalur eksekusi, bukan
+   pemulihan.
+4. **Periode inkonsistensi sementara**: setara pada beban rendah (±37–49 ms),
+   tetapi **±7× lebih lama di choreography pada beban tinggi** (±6,2 s vs
+   ±0,9 s) karena serialisasi rantai event.
+5. **Skalabilitas & titik tunggal**: choreography memproses seluruh transaksi
+   tanpa kehilangan request namun lambat; orchestration lebih cepat namun entry
+   point tunggalnya dapat menolak request pada puncak beban.
 
-**Rekomendasi awal**: untuk sistem dengan prioritas *consistency* dan waktu
-pemulihan cepat pada kegagalan langkah, **orchestration** lebih tepat; untuk
-sistem yang mengutamakan *availability* dan menghindari titik tunggal
-orchestrator, **choreography** lebih tepat — dengan catatan perlu mekanisme
-*event replay / outbox* agar saga yang tertunda tetap selesai.
+**Rekomendasi**: untuk sistem yang membutuhkan latency rendah dan periode
+inkonsistensi sementara pendek, **orchestration** lebih tepat; untuk sistem
+yang menuntut tidak ada request yang hilang dan menghindari titik tunggal,
+**choreography** lebih tepat — dengan catatan perlu mekanisme outbox/event
+replay dan idempotensi pada kompensasi.
+
+## Catatan Metodologi
+
+- Pengukuran awal S7 menghasilkan angka inconsistent yang menyesatkan karena
+  checker mengklasifikasikan saga yang masih berjalan sebagai "inconsistent"
+  (polling terlalu agresif, window quiescence 3 detik < jeda antar-langkah pada
+  beban tinggi). Diperbaiki dengan: query checker per-saga (indeks `saga_id`,
+  bukan full-table scan), interval polling 1,5 detik, deteksi quiescence 10
+  detik berbasis `created_at` `saga_log`, dan klasifikasi langsung saat marker
+  `compensate_failed` ditemukan (saga "sealed").
+- Recovery time dihitung dari timestamp `saga_log` di database service, bukan
+  dari polling workload generator, sehingga presisinya ±milidetik.
+- Nilai latency S6 (±129–188 ms) mencerminkan waktu konfirmasi inkonsistensi,
+  bukan waktu pemulihan (tidak ada pemulihan pada S6).
 
 ## Rekomendasi Langkah Selanjutnya
 
-- Menambahkan metrik *recovery time* eksplisit (timestamp deteksi kegagalan →
-  final state konsisten) via snapshot, bukan hanya latensi request.
-- Menganalisis S7 request-error orchestration lebih dalam (resource limit,
-  HTTP client timeout) sebagai temuan skalabilitas.
 - Menambahkan retry pada compensating transaction dan mengukur dampaknya
   terhadap S6.
+- Eksperimen dengan partisi Kafka > 1 untuk mengamati pengaruh paralelisme
+  terhadap periode inkonsistensi choreography pada S7.
