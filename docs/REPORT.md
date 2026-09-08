@@ -91,6 +91,8 @@ Perbandingan choreography vs orchestration per skenario menggunakan
   satu-pendekatan (S8: choreography only, S9: orchestration only) sehingga tidak
   memiliki pasangan untuk dibandingkan — hasilnya dilaporkan secara deskriptif
   (10/10 dengan satu kategori outcome yang seragam), bukan komparatif.
+  Recovery time S9 tidak dilaporkan karena tidak ada penanda deteksi kegagalan
+  yang setara (timeout HTTP ≠ row `failed` di saga_log).
 
 ## Analisis per Skenario
 

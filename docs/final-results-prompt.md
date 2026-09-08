@@ -104,14 +104,21 @@ berasal dari jalur eksekusi forward (hop Kafka), bukan pemulihan.
 
 ## CAVEAT & KETERBATASAN YANG SUDAH DIDOKUMENTASIKAN
 
-1. **Call-all compensation (S9):** hasil S9 adalah konsekuensi desain `fail()` yang
-   mengompensasi keempat endpoint tanpa syarat (idempotent). Dengan strategi
-   compensate-selective, S9 kemungkinan besar menghasilkan orphaned commit
-   (inkonsistensi permanen) — "orchestration selalu konsisten" BUKAN properti
-   universal, melainkan hasil keputusan desain implementasi ini.
-2. **Confounding factor S2/S3:** selisih recovery time sebagian bisa berasal dari
-   jumlah panggilan ekstra call-all (4 call vs rantai choreography 2–3 hop),
-   di samping penjelasan arsitektural.
+1. **Call-all compensation (S9):** sempat diduga bahwa strategi compensate-selective
+   akan menghasilkan orphaned commit pada S9. Pengujian counterfactual (S9s)
+   MEMBANTAH dugaan ini — hasil S9s identik dengan S9 (100% compensated),
+   karena implementasi `SELECTIVE_COMPENSATE` memverifikasi status commit
+   aktual di database sebelum memutuskan kompensasi, bukan hanya mengandalkan
+   riwayat panggilan orchestrator (kode `internal/orchestration/orchestrator.go`
+   baris 59-73: `stepCommitted()` query `SELECT status FROM <table> WHERE saga_id = $1`).
+   Dengan demikian, **ketahanan orchestration terhadap kondisi in-doubt TIDAK
+   bergantung pada strategi call-all vs selective, selama proses kompensasi
+   memverifikasi status aktual di database**.
+2. **Confounding factor S2/S3:** terisolasi secara empiris oleh S2s & S3s. S3
+   (call-all) recovery 26,0 ms vs S3s (selective) recovery 28 ms — selisih 2 ms
+   (di dalam std dev). Call-all **tidak menambah overhead terukur** pada recovery
+   time. Selisih choreography vs orchestration murni arsitektural, bukan
+   artefak jumlah HTTP call.
 3. **S8/S9 dieksklusi dari MWU** (skenario satu-pendekatan, tak ada pasangan komparatif);
    keduanya 10 run (observasi awal, bukan 30).
 4. **S4/S5** memakai DELAY_MS=3000 untuk window crash deterministik (tanpa delay, saga

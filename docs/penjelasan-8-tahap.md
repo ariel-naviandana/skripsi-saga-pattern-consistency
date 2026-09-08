@@ -201,6 +201,11 @@ projek-skripsi/
 - `Start()`: HTTP POST berurutan ke 4 service → kalau gagal, panggil `fail()`.
 - `fail()`: panggil compensate berurutan ke 4 endpoint. **Kalau SELECTIVE_COMPENSATE
   aktif, query DB dulu sebelum kompensasi** (skip yang tidak commit).
+- `stepCommitted()` (baris 59-73): `pool.QueryRow(ctx, "SELECT status FROM %s WHERE
+  saga_id = $1", table, sagaID).Scan(&status)` — **query indexed ke PostgreSQL**
+  untuk verifikasi status commit aktual. Bukan cek variabel internal / history.
+  Inilah yang membuat S9s (selective) hasilnya identik dengan S9 (call-all):
+  kedua mode melihat kebenaran yang sama di database.
 
 ### `internal/consistency/checker.go` — Outcome Classifier
 - `Timeline(sagaID)`: return (detection, final, first) timestamps dari saga_log.
@@ -287,6 +292,10 @@ ubah kode.
 | S3 latency | 1624 ms | 150 ms | ya |
 | S7 latency | 8476 ms | 5010 ms | ya |
 | S7 window | 5152 ms | 628 ms | ya |
+| **S9 outcome** | — | **10/10 compensated + needless** (100% konsisten) | (single-approach, deskriptif) |
+| **S9s outcome** | — | **10/10 compensated** (100% konsisten, identik S9) | counterfactual RM1/RM2 |
+| **S2s recovery** | — | **67 ± 81 ms** (outlier 296 ms run 1; tanpa outlier ~30 ms) | counterfactual RM3 |
+| **S3s recovery** | — | **28 ms** | counterfactual RM3 |
 
 **Isolasi confounding RM3:**
 - S3 (call-all) recovery: 26,0 ms
