@@ -63,7 +63,10 @@ Hasil (10 run): **10/10 `compensated` dengan flag `needless_compensation=true`**
 order, payment, inventory committed lalu semuanya dikompensasi; tidak ada marker
 kegagalan. Konsistensi data **terjaga 100%** (semua service mencapai status akhir
 compensated), tetapi transaksi yang seharusnya valid **dibatalkan sia-sia** (false
-negative). Data: `docs/runs/S9/orchestration/`.
+negative). Catatan: hasil ini adalah konsekuensi strategi kompensasi **call-all**
+(`fail()` mengompensasi keempat endpoint tanpa syarat); dengan strategi
+compensate-selective, S9 kemungkinan besar menghasilkan orphaned commit
+(inkonsistensi permanen) — lihat REPORT.md. Data: `docs/runs/S9/orchestration/`.
 
 ### Pasangan S8 + S9 (perbandingan adil)
 

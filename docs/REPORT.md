@@ -78,6 +78,10 @@ Perbandingan choreography vs orchestration per skenario menggunakan
 - **Window inkonsistensi beban rendah (S1/S2)**: tidak berbeda signifikan.
 - **Latency & window inkonsistensi beban tinggi (S7)**: berbeda signifikan,
   orchestration jauh lebih cepat/singkat.
+- **S8 dan S9 dieksklusi dari uji ini**: keduanya skenario eksklusif
+  satu-pendekatan (S8: choreography only, S9: orchestration only) sehingga tidak
+  memiliki pasangan untuk dibandingkan — hasilnya dilaporkan secara deskriptif
+  (10/10 dengan satu kategori outcome yang seragam), bukan komparatif.
 
 ## Analisis per Skenario
 
@@ -99,6 +103,13 @@ Pola sama dengan S2: kompensasi penuh (100%), **recovery time berbeda signifikan
 (selisih ±13 ms). Periode inkonsistensi sementara juga berbeda signifikan (36,8 vs
 48,8 ms, p<0,0001). Arah temuan ini mendukung klaim Malyuga et al. (2020) bahwa
 choreography bekerja lebih cepat pada mekanisme koordinasinya.
+
+**Catatan confounding factor (S2/S3):** selisih recovery time perlu dibaca dengan
+hati-hati. Strategi kompensasi call-all pada orchestrator mengirim **4 panggilan
+HTTP kompensasi** (termasuk ke shipping yang tidak pernah berpartisipasi), sedangkan
+rantai kompensasi choreography hanya menyentuh service yang benar-benar terlibat
+(2–3 hop). Sebagian selisih kecepatan recovery orchestration (±3–13 ms) dapat
+berasal dari jumlah panggilan ekstra ini, di samping penjelasan arsitektural murni.
 
 ### S6 — Kegagalan Compensating Transaction
 Kedua pendekatan **tidak** dapat memulihkan konsistensi (0%). Compensating
@@ -152,6 +163,18 @@ konsistensi data (stuck), orchestration mengorbankan transaksi yang valid
 menggantung tanpa penyelesaian. Temuan ini selaras dengan analisis Malyuga et
 al. (2020) bahwa endpoint idempotent dan pemulihan state diperlukan pada
 sistem berbasis orchestrator.
+
+**Caveat penting (konsekuensi desain, bukan properti universal):** hasil S9
+(100% konsisten, needless compensation) adalah konsekuensi langsung dari
+strategi kompensasi **call-all** pada `fail()` di `internal/orchestration/
+orchestrator.go`, yang mengompensasi keempat endpoint tanpa syarat (dan
+kompensasi bersifat idempotent). Jika implementasi memakai strategi
+**compensate-selective** (hanya mengompensasi step yang terkonfirmasi berhasil),
+hasil S9 kemungkinan besar berupa **orphaned commit** (data yang sukses tetapi
+tidak pernah dikompensasi → inkonsistensi permanen), bukan needless
+compensation. Dengan demikian, "orchestration selalu berakhir konsisten" bukan
+properti universal pola orchestration — melainkan hasil dari keputusan desain
+spesifik implementasi ini.
 
 ## Observasi S4 & S5 (otomatis, 10 run)
 
