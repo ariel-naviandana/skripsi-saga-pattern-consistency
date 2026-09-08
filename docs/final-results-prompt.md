@@ -56,6 +56,8 @@ terlewat, (3) apa yang harus diperbaiki sebelum sidang. Jujur dan kritis.
 | S8 | Event loss parsial (order.created di-drop diam-diam, broker hidup) | choreography (10×) | **10/10 inconsistent — saga STUCK permanen** (order committed, tak ada yang tahu, kompensasi tak terpicu) |
 | S9 | Response hilang / in-doubt (inventory commit sukses tapi response HTTP di-drop, orchestrator timeout) | orchestration (10×) | **10/10 compensated + needless_compensation=true** — konsistensi 100% tapi transaksi valid dibatalkan sia-sia |
 | S9s | S9 + SELECTIVE_COMPENSATE (orchestrator skip kompensasi untuk service yang tidak committed) | orchestration (10×) | **10/10 compensated** — hasil data identik dengan S9; selective membaca kebenaran DB, jadi orphaned commit (prediksi) tidak terjadi. Perbedaan call-all vs selective pada S9 murni efisiensi (1 HTTP call tambahan ke shipping yang no-op) |
+| S2s | Shipping gagal + SELECTIVE_COMPENSATE | orchestration (10×) | **10/10 compensated, recovery 67 ms** (outlier 296 ms run 1, tanpa outlier ~30 ms) — counterfactual RM3 confounding |
+| S3s | Inventory gagal + SELECTIVE_COMPENSATE | orchestration (10×) | **10/10 compensated, recovery 28 ms** — counterfactual RM3 confounding: call-all (S3) 26 ms vs selective (S3s) 28 ms = confounding terisolasi, selisih murni arsitektural |
 
 ## TEMUAN UTAMA (jawaban per RM)
 
@@ -93,6 +95,12 @@ berasal dari jalur eksekusi forward (hop Kafka), bukan pemulihan.
    call-all vs selective murni efisiensi (±30 ms latency tambahan). Caveat call-all
    tetap valid untuk konteks S2/S3 (di mana call-all menambah jumlah HTTP call
    dan berpotensi mempengaruhi recovery time), tapi belum diisolasi secara empiris.
+5. **S2s & S3s (isolasi confounding RM3):** skenario step-failure (Shipping/Inventory
+   gagal) dengan SELECTIVE_COMPENSATE. Hasil S3 (call-all): recovery 26,0 ms; S3s
+   (selective): 28 ms — selisih 2 ms di dalam std dev menunjukkan **call-all tidak
+   menambah overhead terukur pada recovery time**. Selisih choreography vs
+   orchestration murni arsitektural, bukan artefak jumlah HTTP call. Confounding
+   RM3 **terisolasi secara empiris**.
 
 ## CAVEAT & KETERBATASAN YANG SUDAH DIDOKUMENTASIKAN
 

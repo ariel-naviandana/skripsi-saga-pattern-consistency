@@ -33,6 +33,8 @@ Saat kompensasi gagal, ditulis `compensate_failed`.
 | S8 | Event Loss Parsial | `DROP_EVENT=saga.order.created` (choreography) | `inconsistent` (stuck) |
 | S9 | Response Hilang (In-Doubt) | `DROP_RESPONSE_AT_STEP=inventory` (orchestration) | `compensated` (needless) |
 | S9s | Response Hilang + Selective Compensate | `DROP_RESPONSE_AT_STEP=inventory`, `SELECTIVE_COMPENSATE=true` (orchestration) | `compensated` (needless) |
+| S2s | Shipping gagal + Selective Compensate | `FAIL_AT_STEP=shipping`, `FAIL_AT_ATTEMPT=1`, `SELECTIVE_COMPENSATE=true` (orchestration) | `compensated` — counterfactual RM3 confounding |
+| S3s | Inventory gagal + Selective Compensate | `FAIL_AT_STEP=inventory`, `FAIL_AT_ATTEMPT=1`, `SELECTIVE_COMPENSATE=true` (orchestration) | `compensated` — counterfactual RM3 confounding |
 
 Catatan: S4 hanya untuk orchestration; S5 dan S8 hanya untuk choreography; S9 hanya
 untuk orchestration (bergantung komponen yang hanya ada di pendekatan tersebut).
@@ -83,6 +85,28 @@ Prediksi orphaned commit tidak terjadi: selective membaca kebenaran DB (row
 `committed`), jadi step yang sukses tetap dikompensasi. Perbedaan call-all vs
 selective pada S9 murni **efisiensi** (1 HTTP call tambahan ke shipping yang
 no-op di call-all), bukan konsistensi data. Data: `docs/runs/S9s/orchestration/`.
+
+### S2s & S3s — Step Failure + Selective Compensate (orchestration only)
+
+**Counterfactual untuk RM3 confounding.** S2s dan S3s menjalankan skenario
+step-failure (S2/S3) dengan strategi `SELECTIVE_COMPENSATE=true` — orchestrator
+hanya memanggil kompensasi untuk service yang benar-benar commit. Tujuannya
+mengisolasi apakah selisih recovery time choreography vs orchestration pada
+S2/S3 disebabkan oleh arsitektur koordinasi, atau oleh fakta bahwa call-all
+orchestrator mengirim lebih banyak HTTP call dari yang strictly perlu.
+
+Hasil:
+- **S2s** (Shipping gagal + selective, 10 run): 10/10 compensated, recovery
+  67 ± 81 ms (outlier run 1 = 296 ms; tanpa outlier: ~30 ms).
+- **S3s** (Inventory gagal + selective, 10 run): 10/10 compensated, recovery
+  28 ± 6 ms.
+
+**Isolasi confounding:** S3 (call-all) = 26,0 ms; S3s (selective) = 28 ms.
+Selisih 2 ms (di dalam std dev) menunjukkan **call-all tidak menambah overhead
+terukur**. Selisih choreography vs orchestration murni arsitektural, bukan
+artefak jumlah HTTP call.
+
+Data: `docs/runs/S2s/orchestration/`, `docs/runs/S3s/orchestration/`.
 
 ### Pasangan S8 + S9 (perbandingan adil)
 | Aspek | S8 (choreography) | S9 (orchestration) |

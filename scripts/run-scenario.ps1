@@ -21,6 +21,8 @@ switch ($Scenario) {
   "S8" { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = "saga.order.created"; $env:DROP_RESPONSE_AT_STEP = "" }
   "S9" { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "inventory"; $env:SELECTIVE_COMPENSATE = "false" }
   "S9s" { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "inventory"; $env:SELECTIVE_COMPENSATE = "true" }
+  "S2s" { $env:FAIL_AT_STEP = "shipping"; $env:FAIL_AT_ATTEMPT = "1"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = ""; $env:SELECTIVE_COMPENSATE = "true" }
+  "S3s" { $env:FAIL_AT_STEP = "inventory"; $env:FAIL_AT_ATTEMPT = "1"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = ""; $env:SELECTIVE_COMPENSATE = "true" }
   default { throw "unsupported scenario $Scenario" }
 }
 

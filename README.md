@@ -94,6 +94,8 @@ Hasil JSON per iterasi tersimpan di `docs/runs/<Skenario>/<approach>/`.
 | S8 | Event Loss (partial) | Choreography | First `order.created` event silently dropped (dual-write) |
 | S9 | Response Loss (in-doubt) | Orchestration | Step commits but HTTP response withheld → needless compensation |
 | S9s | Response Loss + Selective Compensate | Orchestration | Same as S9 but orchestrator skips compensation for non-committed steps |
+| S2s | Step Failure (Shipping) + Selective Compensate | Orchestration | Counterfactual RM3: same as S2 but with selective compensation to isolate call-all confounding |
+| S3s | Step Failure (Inventory) + Selective Compensate | Orchestration | Counterfactual RM3: same as S3 but with selective compensation to isolate call-all confounding |
 
 Detail: [docs/SCENARIOS.md](docs/SCENARIOS.md)
 
