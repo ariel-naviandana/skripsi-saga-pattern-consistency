@@ -23,23 +23,23 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 
 | Skenario | Approach | Txns | Committed | Compensated | Inconsistent | Consistency% | CTSR% | Recovery (ms) | Inconsistency window (ms) | Latency (ms) |
 |----------|----------|------|-----------|-------------|--------------|--------------|-------|---------------|---------------------------|--------------|
-| S1 | choreography | 30 | 30 | 0 | 0 | 100.0 | — | — | 31 | 165 |
-| S1 | orchestration | 30 | 30 | 0 | 0 | 100.0 | — | — | 31 | 154 |
-| S2 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 22 | 48 | 1639 |
-| S2 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 25 | 49 | 160 |
-| S3 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 18 | 37 | 1670 |
-| S3 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 31 | 49 | 173 |
-| S6 | choreography | 30 | 0 | 0 | 30 | 0.0 | 0.0 | — | 25 | 129 |
-| S6 | orchestration | 30 | 0 | 0 | 30 | 0.0 | 0.0 | — | 50 | 188 |
+| S1 | choreography | 30 | 30 | 0 | 0 | 100.0 | — | — | 42 | 427 |
+| S1 | orchestration | 30 | 30 | 0 | 0 | 100.0 | — | — | 26 | 128 |
+| S2 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 22 | 49 | 1639 |
+| S2 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 29 | 52 | 163 |
+| S3 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 13 | 27 | 1624 |
+| S3 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 26 | 40 | 150 |
+| S6 | choreography | 30 | 0 | 0 | 30 | 0.0 | 0.0 | tak pulih | 28 | 123 |
+| S6 | orchestration | 30 | 0 | 0 | 30 | 0.0 | 0.0 | tak pulih | 42 | 156 |
 
 ### Skenario konkurensi (S7, 500 transaksi/iterasi → 15.000 transaksi total)
 
 | Skenario | Approach | Txns | Committed | Unrecorded* | Consistency% | Inconsistency window (ms) | Latency (ms) |
 |----------|----------|------|-----------|-------------|--------------|---------------------------|--------------|
-| S7 | choreography | 15000 | 15000 | 0 | 100.0 | 6238 | 9722 |
-| S7 | orchestration | 15000 | 14998 | 2 | 100.0 | 864 | 5241 |
-| S8 | choreography | 10 | 0 | 0 | 0.0 (stuck) | 0 | 12811 |
-| S9 | orchestration | 10 | 0 (10 compensated) | 0 | 100.0 (needless) | 10056 | 10162 |
+| S7 | choreography | 15000 | 15000 | 0 | 100.0 | 5152 | 8476 |
+| S7 | orchestration | 15000 | 14918 | 82 | 99.5 | 628 | 5010 |
+| S8 | choreography | 10 | 0 | 0 | 0.0 (stuck) | 0 | 12345 |
+| S9 | orchestration | 10 | 0 (10 compensated) | 0 | 100.0 (needless) | 10043 | 10127 |
 
 \* Unrecorded = request yang gagal terkirim/mendapat respons di pintu masuk saat
 puncak beban (koneksi diputus paksa); transaksi tidak pernah dimulai, bukan
@@ -56,26 +56,32 @@ Perbandingan choreography vs orchestration per skenario menggunakan
 
 | Skenario | Metrik | Choreo (ms) | Orchestr. (ms) | p-value | Signifikan |
 |----------|--------|-------------|----------------|---------|------------|
-| S1 | latency | 165,2 ± 276,2 | 154,1 ± 29,2 | <0,0001 | ya |
-| S1 | inconsistency window | 30,8 ± 4,9 | 30,6 ± 8,4 | 0,2178 | tidak |
-| S2 | latency | 1638,7 ± 16,3 | 160,2 ± 16,6 | <0,0001 | ya |
-| S2 | inconsistency window | 48,0 ± 9,2 | 48,8 ± 6,6 | 0,3493 | tidak |
-| S2 | **recovery time** | **22,5 ± 3,8** | **25,3 ± 3,5** | **0,0004** | **ya** |
-| S3 | latency | 1670,2 ± 48,3 | 173,1 ± 21,1 | <0,0001 | ya |
-| S3 | inconsistency window | 36,8 ± 8,1 | 48,8 ± 12,6 | <0,0001 | ya |
-| S3 | **recovery time** | **18,0 ± 4,5** | **31,1 ± 7,9** | **<0,0001** | **ya** |
-| S6 | latency | 128,5 ± 13,6 | 188,0 ± 39,5 | <0,0001 | ya |
-| S6 | inconsistency window | 24,5 ± 5,3 | 50,0 ± 18,1 | <0,0001 | ya |
-| S7 | latency | 9721,6 ± 823,8 | 5240,7 ± 794,6 | <0,0001 | ya |
-| S7 | inconsistency window | 6238,0 ± 912,9 | 863,7 ± 313,7 | <0,0001 | ya |
+| S1 | latency | 426,8 ± 633,1 | 127,7 ± 33,4 | 0,7337 | tidak |
+| S1 | inconsistency window | 41,5 ± 22,7 | 26,3 ± 7,3 | <0,0001 | ya |
+| S2 | latency | 1639,2 ± 35,5 | 163,1 ± 26,0 | <0,0001 | ya |
+| S2 | inconsistency window | 49,4 ± 17,9 | 52,0 ± 9,0 | 0,1275 | tidak |
+| S2 | **recovery time** | **22,0 ± 6,7** | **28,7 ± 6,4** | **0,0002** | **ya** |
+| S3 | latency | 1623,9 ± 19,5 | 149,6 ± 33,5 | <0,0001 | ya |
+| S3 | inconsistency window | 27,2 ± 6,4 | 40,1 ± 9,8 | <0,0001 | ya |
+| S3 | **recovery time** | **12,8 ± 3,0** | **26,0 ± 6,5** | **<0,0001** | **ya** |
+| S6 | latency | 122,9 ± 22,7 | 156,2 ± 30,0 | <0,0001 | ya |
+| S6 | inconsistency window | 27,7 ± 6,8 | 41,7 ± 8,2 | <0,0001 | ya |
+| S7 | latency | 8476,1 ± 1541,5 | 5009,9 ± 1100,7 | <0,0001 | ya |
+| S7 | inconsistency window | 5152,0 ± 1428,9 | 628,1 ± 360,5 | <0,0001 | ya |
 
 **Interpretasi:**
 - **Recovery time (S2/S3)**: perbedaan **signifikan** — choreography pulih lebih
-  cepat (p<0,001). Magnitudo kecil (±3–13 ms); secara praktis keduanya pulih
-  dalam puluhan milidetik. Klaim "setara" yang dilaporkan pada pengukuran awal
-  **dikoreksi**: secara statistik tidak setara, melainkan choreography lebih
-  cepat — sejalan dengan klaim Malyuga et al. (2020).
-- **Window inkonsistensi beban rendah (S1/S2)**: tidak berbeda signifikan.
+  cepat (S2: p=0,0002; S3: p<0,0001). Magnitudo kecil (±5–13 ms); secara
+  praktis keduanya pulih dalam puluhan milidetik. Klaim "setara" yang dilaporkan
+  pada pengukuran awal **dikoreksi**: secara statistik tidak setara, melainkan
+  choreography lebih cepat — sejalan dengan klaim Malyuga et al. (2020).
+- **Window inkonsistensi S1** (tidak ada kegagalan): berbeda signifikan
+  (choreography lebih lebar). **Latency S1** (tidak ada kegagalan): TIDAK
+  berbeda signifikan (p=0,73) setelah re-run final — klaim awal "S1 latency
+  berbeda signifikan" tidak stabil di lintas run (outlier 1626 ms pada run
+  sebelumnya menghilang), sehingga tidak layak dipublikasikan sebagai temuan
+  komparatif pada S1.
+- **Window inkonsistensi S2** (ada kegagalan): tidak berbeda signifikan.
 - **Latency & window inkonsistensi beban tinggi (S7)**: berbeda signifikan,
   orchestration jauh lebih cepat/singkat.
 - **S8 dan S9 dieksklusi dari uji ini**: keduanya skenario eksklusif
@@ -87,21 +93,26 @@ Perbandingan choreography vs orchestration per skenario menggunakan
 
 ### S1 — Baseline Normal
 Kedua pendekatan konsisten penuh (100%). Periode inkonsistensi sementara
-identik (±31 ms) dan latency seimbang (±165 vs ±154 ms).
+berbeda signifikan secara statistik (choreography 41,5 ms vs orchestration 26,3 ms,
+p<0,0001), namun latency end-to-end **tidak berbeda signifikan** (Mann-Whitney U,
+p=0,73) setelah re-run final — klaim awal "S1 latency berbeda signifikan" terbukti
+tidak stabil di lintas run (didukung outlier tunggal pada pengukuran sebelumnya).
+S1 tidak menunjukkan perbandingan komparatif yang kuat untuk latency karena
+tidak ada kegagalan yang dieksploitasi.
 
 ### S2 — Kegagalan Shipping (langkah akhir)
 Kompensasi berantai berhasil penuh di kedua pendekatan (CTSR 100%).
-**Recovery time berbeda signifikan secara statistik** (Mann-Whitney U, p<0,001):
-choreography 22,5 ms vs orchestration 25,3 ms — choreography lebih cepat, namun
-magnitudo selisih kecil (±3 ms). Perbedaan latency end-to-end (±1639 vs ±160 ms)
+**Recovery time berbeda signifikan secara statistik** (Mann-Whitney U, p=0,0002):
+choreography 22,0 ms vs orchestration 28,7 ms — choreography lebih cepat, namun
+magnitudo selisih kecil (±5–7 ms). Perbedaan latency end-to-end (±1639 vs ±163 ms)
 jauh lebih besar dan berasal dari jalur eksekusi forward choreography yang melewati
 beberapa hop Kafka, bukan dari kecepatan pemulihan.
 
 ### S3 — Kegagalan Inventory (langkah tengah)
 Pola sama dengan S2: kompensasi penuh (100%), **recovery time berbeda signifikan**
-(p<0,0001): choreography 18,0 ms vs orchestration 31,1 ms — choreography lebih cepat
-(selisih ±13 ms). Periode inkonsistensi sementara juga berbeda signifikan (36,8 vs
-48,8 ms, p<0,0001). Arah temuan ini mendukung klaim Malyuga et al. (2020) bahwa
+(p<0,0001): choreography 12,8 ms vs orchestration 26,0 ms — choreography lebih
+cepat (selisih ±13 ms). Periode inkonsistensi sementara juga berbeda signifikan (27,2 vs
+40,1 ms, p<0,0001). Arah temuan ini mendukung klaim Malyuga et al. (2020) bahwa
 choreography bekerja lebih cepat pada mekanisme koordinasinya.
 
 **Catatan confounding factor (S2/S3):** selisih recovery time perlu dibaca dengan
@@ -122,14 +133,16 @@ compensating transaction.
 Hasil setelah perbaikan metodologi pengukuran (deteksi quiescence berbasis
 `created_at` `saga_log`): **kedua pendekatan 100% konsisten** untuk seluruh
 transaksi yang diproses. Perbedaan utama:
-- **Periode inkonsistensi sementara**: choreography ±6238 ms vs orchestration
-  ±864 ms — ±7× lebih lama. Rantai event Kafka dengan partisi tunggal
+- **Periode inkonsistensi sementara**: choreography ±5152 ms vs orchestration
+  ±628 ms — ±8× lebih lama. Rantai event Kafka dengan partisi tunggal
   mengantri 500 transaksi secara serial, sehingga transaksi terakhir berada
   dalam kondisi parsial selama beberapa detik.
-- **Latency end-to-end**: choreography ±9722 ms vs orchestration ±5241 ms.
+- **Latency end-to-end**: choreography ±8476 ms vs orchestration ±5010 ms.
 - **Availability pintu masuk**: choreography memproses seluruh 15.000 transaksi;
-  orchestration kehilangan 2 request (0.01%) saat puncak beban karena entry
-  point tunggalnya (orchestrator + port forward) menolak koneksi.
+  orchestration kehilangan 82 request (0,55%) saat puncak beban karena entry
+  point tunggalnya (orchestrator + port forward) menolak koneksi — fluktuasi
+  run-to-run tinggi (run sebelumnya mencatat 2 unrecorded) menandakan bahwa
+  kondisi mesin lebih berperan daripada desain sistemik.
 
 ### S8 — Event Loss Parsial (choreography only)
 Mensimulasikan *dual-write problem*: order di-commit ke database, tetapi event
@@ -209,9 +222,9 @@ pendekatan masing-masing.
    tidak terpicu sama sekali (tidak ada yang mengetahui kegagalan); pada S9
    kompensasi berhasil penuh (100%) namun tidak diperlukan (false negative).
 3. **Recovery time (RM3)**: berbeda signifikan secara statistik (Mann-Whitney U)
-   pada skenario kegagalan langkah — choreography lebih cepat (S2: 22,5 vs
-   25,3 ms, p<0,001; S3: 18,0 vs 31,1 ms, p<0,0001). Magnitudo selisih kecil
-   (±3–13 ms) dan keduanya pulih dalam puluhan milidetik. Klaim awal
+   pada skenario kegagalan langkah — choreography lebih cepat (S2: 22,0 vs
+   28,7 ms, p=0,0002; S3: 12,8 vs 26,0 ms, p<0,0001). Magnitudo selisih kecil
+   (±5–13 ms) dan keduanya pulih dalam puluhan milidetik. Klaim awal
    "orchestration jauh lebih cepat pulih" tidak terdukung; perbedaan latency
    yang besar berasal dari jalur eksekusi, bukan pemulihan.
 4. **Periode inkonsistensi sementara**: tidak berbeda signifikan pada S1/S2

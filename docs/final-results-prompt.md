@@ -46,13 +46,13 @@ terlewat, (3) apa yang harus diperbaiki sebelum sidang. Jujur dan kritis.
 
 | Skenario | Deskripsi | Pendekatan | Hasil |
 |----------|-----------|-----------|-------|
-| S1 | Baseline normal | keduanya (30×) | 100% committed keduanya; window inkonsistensi 31 vs 31 ms (tidak signifikan); latency 165 vs 154 ms |
-| S2 | Shipping gagal (langkah akhir) | keduanya (30×) | 100% compensated, CTSR 100% keduanya; **recovery time 22,5 vs 25,3 ms (p<0,001)**; latency 1639 vs 160 ms |
-| S3 | Inventory gagal (langkah tengah) | keduanya (30×) | 100% compensated, CTSR 100%; **recovery time 18,0 vs 31,1 ms (p<0,0001)**; latency 1670 vs 173 ms |
+| S1 | Baseline normal | keduanya (30×) | 100% committed keduanya; window inkonsistensi 41,5 vs 26,3 ms (p<0,0001); latency 427 vs 128 ms (TIDAK signifikan p=0,73) |
+| S2 | Shipping gagal (langkah akhir) | keduanya (30×) | 100% compensated, CTSR 100% keduanya; **recovery time 22,0 vs 28,7 ms (p=0,0002)**; latency 1639 vs 163 ms |
+| S3 | Inventory gagal (langkah tengah) | keduanya (30×) | 100% compensated, CTSR 100%; **recovery time 12,8 vs 26,0 ms (p<0,0001)**; latency 1624 vs 150 ms |
 | S4 | Orchestrator Crash (mid-saga) | orchestration (10×) | 10/10 inconsistent (partial commit, kompensasi tak jalan) |
-| S5 | Kafka Down (mid-chain) | choreography (10×) | 10/10 inconsistent (saga macet) |
+| S5 | Kafka Down (mid-chain, dengan DELAY_MS=3000) | choreography (10×) | 10/10 inconsistent — order+payment committed (DELAY memberi waktu Kafka kirim ke payment sebelum stop) |
 | S6 | Compensating tx gagal (FAIL_ON_COMPENSATE) | keduanya (30×) | 0% consistency, CTSR 0% keduanya |
-| S7 | 500 transaksi konkuren (15.000 total) | keduanya (30×) | 100% committed keduanya (choreo 15000/15000; orch 14998/15000 + 2 request ditolak); **window inkonsistensi 6238 vs 864 ms (p<0,0001)**; latency 9722 vs 5241 ms |
+| S7 | 500 transaksi konkuren (15.000 total) | keduanya (30×) | 100% committed (choreo 15000/15000; orch 14918/15000 + 82 request ditolak — fluktuasi run-to-run tinggi); **window inkonsistensi 5152 vs 628 ms (p<0,0001)**; latency 8476 vs 5010 ms |
 | S8 | Event loss parsial (order.created di-drop diam-diam, broker hidup) | choreography (10×) | **10/10 inconsistent — saga STUCK permanen** (order committed, tak ada yang tahu, kompensasi tak terpicu) |
 | S9 | Response hilang / in-doubt (inventory commit sukses tapi response HTTP di-drop, orchestrator timeout) | orchestration (10×) | **10/10 compensated + needless_compensation=true** — konsistensi 100% tapi transaksi valid dibatalkan sia-sia |
 
@@ -69,10 +69,21 @@ tidak pernah terpicu (tidak ada yang tahu); pada S9 kompensasi berhasil 100% nam
 tidak diperlukan (false negative).
 
 **RM3 (recovery time):** berbeda signifikan (Mann-Whitney U): CHOREOGRAPHY LEBIH CEPAT
-(S2: 22,5 vs 25,3 ms p<0,001; S3: 18,0 vs 31,1 ms p<0,0001) — magnitudo kecil
-(±3–13 ms), keduanya pulih dalam puluhan milidetik. Klaim umum "orchestration jauh
-lebih cepat pulih" TIDAK terdukung. Perbedaan latency end-to-end besar (10×) berasal
-dari jalur eksekusi forward (hop Kafka), bukan pemulihan.
+(S2: 22,0 vs 28,7 ms p=0,0002; S3: 12,8 vs 26,0 ms p<0,0001) — magnitudo kecil
+(±5–13 ms), keduanya pulih dalam puluhan milidetik. Klaim umum "orchestration jauh
+lebih cepat pulih" TIDAK terdukung. Perbedaan latency end-to-end besar (10×)
+berasal dari jalur eksekusi forward (hop Kafka), bukan pemulihan.
+
+## PERUBAHAN SIGNIFIKAN vs RUN SEBELUMNYA
+
+1. **S1 latency:** klaim awal "signifikan berbeda" tidak stabil — di re-run final
+   p=0,73 (tidak signifikan), karena outlier 1626 ms menghilang. Tidak dipublikasikan
+   sebagai temuan komparatif S1.
+2. **S7 orchestration unrecorded:** 82 (run sebelumnya 2) — fluktuasi run-to-run
+   besar; menunjukkan fenomena kejenuhan titik tunggal, namun bukan properti
+   desain sistemik yang stabil.
+3. **Recovery time S2:** selisih choreography vs orchestration bergeser dari
+   (22,5 vs 25,3 ms) ke (22,0 vs 28,7 ms) — tetap signifikan, arah sama.
 
 ## CAVEAT & KETERBATASAN YANG SUDAH DIDOKUMENTASIKAN
 
