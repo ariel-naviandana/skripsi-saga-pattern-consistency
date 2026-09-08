@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/ariel-naviandana/skripsi-saga-pattern-consistency/internal/business"
 	"github.com/ariel-naviandana/skripsi-saga-pattern-consistency/internal/common"
@@ -17,6 +18,18 @@ type BusinessHandler struct {
 	Payment   *business.PaymentService
 	Inventory *business.InventoryService
 	Shipping  *business.ShippingService
+	Fault     *common.FaultConfig
+}
+
+// dropResponseIfConfigured implements S9: if the fault config targets this
+// step, the step has already committed successfully, but the response is
+// withheld past the orchestrator's HTTP timeout (10s), so the orchestrator
+// concludes the step failed and starts compensation.
+func dropResponseIfConfigured(w http.ResponseWriter, fc *common.FaultConfig, step string) {
+	if fc != nil && fc.ShouldDropResponse(step) {
+		time.Sleep(12 * time.Second)
+		log.Printf("http: response for step %s dropped (S9)", step)
+	}
 }
 
 // OrderProcess handles POST /orders/process.
@@ -31,6 +44,7 @@ func (h *BusinessHandler) OrderProcess(w http.ResponseWriter, r *http.Request) {
 		common.JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+	dropResponseIfConfigured(w, h.Fault, "order")
 	common.JSON(w, http.StatusOK, orchestration.StepResponse{OrderID: orderID, Status: "committed"})
 }
 
@@ -50,6 +64,7 @@ func (h *BusinessHandler) PaymentProcess(w http.ResponseWriter, r *http.Request)
 		common.JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+	dropResponseIfConfigured(w, h.Fault, "payment")
 	common.JSON(w, http.StatusOK, orchestration.StepResponse{Status: "committed"})
 }
 
@@ -69,6 +84,7 @@ func (h *BusinessHandler) InventoryReserve(w http.ResponseWriter, r *http.Reques
 		common.JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+	dropResponseIfConfigured(w, h.Fault, "inventory")
 	common.JSON(w, http.StatusOK, orchestration.StepResponse{Status: "committed"})
 }
 
@@ -88,6 +104,7 @@ func (h *BusinessHandler) ShippingSchedule(w http.ResponseWriter, r *http.Reques
 		common.JSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
+	dropResponseIfConfigured(w, h.Fault, "shipping")
 	common.JSON(w, http.StatusOK, orchestration.StepResponse{Status: "committed"})
 }
 

@@ -31,9 +31,10 @@ Saat kompensasi gagal, ditulis `compensate_failed`.
 | S6 | Kegagalan Compensating Tx | `FAIL_AT_STEP=inventory`, `FAIL_AT_ATTEMPT=1`, `FAIL_ON_COMPENSATE=true` | `inconsistent` |
 | S7 | Konkurensi 500 Transaksi | tidak ada, 500 request bersamaan | `committed` (semua) |
 | S8 | Event Loss Parsial | `DROP_EVENT=saga.order.created` (choreography) | `inconsistent` (stuck) |
+| S9 | Response Hilang (In-Doubt) | `DROP_RESPONSE_AT_STEP=inventory` (orchestration) | `compensated` (needless) |
 
-Catatan: S4 hanya untuk orchestration, S5 dan S8 hanya untuk choreography (bergantung
-komponen yang hanya ada di pendekatan tersebut).
+Catatan: S4 hanya untuk orchestration; S5 dan S8 hanya untuk choreography; S9 hanya
+untuk orchestration (bergantung komponen yang hanya ada di pendekatan tersebut).
 
 ### S8 — Event Loss Parsial (choreography only)
 
@@ -48,6 +49,34 @@ tidak berpartisipasi, tidak ada marker kegagalan sehingga kompensasi tidak terpi
 saga **stuck permanen** tanpa mekanisme yang menyelamatkan (tanpa outbox/replay).
 Orchestration secara struktural kebal terhadap kondisi ini (pemanggilan HTTP langsung,
 tanpa broker perantara). Data: `docs/runs/S8/choreography/`.
+
+### S9 — Response Hilang / In-Doubt (orchestration only)
+
+**Pasangan struktural dari S8** — akar masalah yang sama (sinyal koordinasi hilang),
+mekanisme berbeda (response HTTP vs event broker). Operasi inventory **berhasil
+di-commit** ke database, tetapi response HTTP-nya di-drop (handler menahan response
+melewati timeout orchestrator 10 detik, `DROP_RESPONSE_AT_STEP=inventory`, one-shot).
+Orchestrator menyimpulkan step gagal dan menjalankan kompensasi penuh — padahal semua
+langkah sebenarnya sukses (over-compensation / in-doubt).
+
+Hasil (10 run): **10/10 `compensated` dengan flag `needless_compensation=true`** —
+order, payment, inventory committed lalu semuanya dikompensasi; tidak ada marker
+kegagalan. Konsistensi data **terjaga 100%** (semua service mencapai status akhir
+compensated), tetapi transaksi yang seharusnya valid **dibatalkan sia-sia** (false
+negative). Data: `docs/runs/S9/orchestration/`.
+
+### Pasangan S8 + S9 (perbandingan adil)
+
+| Aspek | S8 (choreography) | S9 (orchestration) |
+|-------|-------------------|--------------------|
+| Sinyal yang hilang | Event dipublish di-drop | Response HTTP di-drop setelah commit |
+| Akibat pada data | Saga **stuck** — order committed, tak ada penyelesaian | Saga **fully compensated** — konsisten tapi transaksi valid dibatalkan |
+| Konsistensi | 0% (inconsistent) | 100% (compensated, needless) |
+| Akar masalah | Sama: sinyal koordinasi hilang | Sama |
+
+Kedua pendekatan sama-sama rentan terhadap hilangnya sinyal koordinasi, tetapi
+manifestasinya berbeda karakter: choreography cenderung **meninggalkan data menggantung**,
+orchestration cenderung **membatalkan transaksi yang sebenarnya valid**.
 
 ## Menjalankan Skenario
 
@@ -131,6 +160,7 @@ Data lengkap: [docs/REPORT.md](REPORT.md) dan `docs/runs/summary.json`.
 | S6 | inconsistent (100%) | inconsistent (100%) |
 | S7 (500×30) | committed (100%, 15000/15000) | committed (100%, 14998/15000; 2 request unrecorded) |
 | S8 (10) | inconsistent (100%, stuck — event order.created di-drop) | — |
+| S9 (10) | — | compensated (100%, needless — response inventory di-drop) |
 | S4 | — | inconsistent (partial, 10/10 otomatis) |
 | S5 | inconsistent (partial, 10/10 otomatis) | — |
 

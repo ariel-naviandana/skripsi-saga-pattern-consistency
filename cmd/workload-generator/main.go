@@ -22,6 +22,7 @@ type result struct {
 	LatencyMS       int64                    `json:"latency_ms"`
 	RecoveryTimeMS  *int64                   `json:"recovery_time_ms,omitempty"`
 	InconsistencyMS *int64                   `json:"inconsistency_ms,omitempty"`
+	Needless        bool                     `json:"needless_compensation,omitempty"`
 }
 
 type summary struct {
@@ -44,6 +45,7 @@ type summary struct {
 	InconsistencyMinMS     int64   `json:"inconsistency_min_ms"`
 	InconsistencyMaxMS     int64   `json:"inconsistency_max_ms"`
 	AvgInconsistencyMS     float64 `json:"avg_inconsistency_ms"`
+	NeedlessCount          int     `json:"needless_compensation_count"`
 	Results      []result  `json:"results,omitempty"`
 }
 
@@ -157,11 +159,18 @@ func main() {
 			// cleanly committed sagas had no failure to recover from.
 			var recoveryMS *int64
 			var inconsistencyMS *int64
-			if outcome == consistency.OutcomeCompensated || outcome == consistency.OutcomeInconsistent {
-				if det, fin, _, terr := checker.Timeline(ctx, sagaID); terr == nil && !det.IsZero() && !fin.IsZero() {
-					if outcome == consistency.OutcomeCompensated {
+			needless := false
+			if outcome == consistency.OutcomeCompensated {
+				// A compensated saga without any "failed" marker in saga_log was
+				// cancelled even though no business step ever failed (S9: the
+				// orchestrator over-compensated because the step's response was
+				// lost). Mark it as a needless compensation.
+				if det, fin, _, terr := checker.Timeline(ctx, sagaID); terr == nil && !fin.IsZero() {
+					if !det.IsZero() {
 						ms := fin.Sub(det).Milliseconds()
 						recoveryMS = &ms
+					} else {
+						needless = true
 					}
 				}
 			}
@@ -182,6 +191,7 @@ func main() {
 				LatencyMS:       latency,
 				RecoveryTimeMS:  recoveryMS,
 				InconsistencyMS: inconsistencyMS,
+				Needless:        needless,
 			})
 			mu.Unlock()
 		}(i)
@@ -265,6 +275,12 @@ func main() {
 	sum.InconsistencyMaxMS = incMax
 	if incCount > 0 {
 		sum.AvgInconsistencyMS = float64(incTotal) / float64(incCount)
+	}
+
+	for _, r := range results {
+		if r.Needless {
+			sum.NeedlessCount++
+		}
 	}
 
 	data, _ := json.MarshalIndent(sum, "", "  ")

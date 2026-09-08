@@ -39,11 +39,13 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 | S7 | choreography | 15000 | 15000 | 0 | 100.0 | 6238 | 9722 |
 | S7 | orchestration | 15000 | 14998 | 2 | 100.0 | 864 | 5241 |
 | S8 | choreography | 10 | 0 | 0 | 0.0 (stuck) | 0 | 12811 |
+| S9 | orchestration | 10 | 0 (10 compensated) | 0 | 100.0 (needless) | 10056 | 10162 |
 
 \* Unrecorded = request yang gagal terkirim/mendapat respons di pintu masuk saat
 puncak beban (koneksi diputus paksa); transaksi tidak pernah dimulai, bukan
-inkonsistensi data. S8 (event loss) dijalankan 10× untuk observasi; latency-nya
-mencakup window konfirmasi quiescence (±10 detik) karena saga tidak pernah selesai.
+inkonsistensi data. S8/S9 (event/response loss) dijalankan 10× untuk observasi;
+latency-nya mencakup window konfirmasi (±10 detik quiescence/timeout) karena saga
+tidak pernah selesai normal.
 
 ## Uji Signifikansi Statistik (Mann-Whitney U)
 
@@ -124,11 +126,32 @@ Mensimulasikan *dual-write problem*: order di-commit ke database, tetapi event
 Hasil **10/10 inconsistent** — saga stuck permanen: Order `committed`, service
 lain tidak berpartisipasi, tidak ada marker kegagalan sehingga kompensasi tidak
 terpicu dan tidak ada mekanisme (outbox/replay) yang menyelamatkannya.
-**Temuan kunci untuk RM1/RM2**: kondisi ini — yang paling sering disebut di
-literatur sebagai titik lemah choreography — tidak dapat dialami orchestration
-secara struktural (pemanggilan HTTP langsung tanpa broker perantara). Dengan
-S8, perbedaan RM1/RM2 menjadi nyata: **setara dalam kondisi normal, berbeda
-pada mode kegagalan event loss yang hanya mungkin terjadi di choreography**.
+
+### S9 — Response Hilang / In-Doubt (orchestration only)
+**Pasangan struktural dari S8** (akar masalah sama: sinyal koordinasi hilang).
+Inventory berhasil di-commit tetapi response HTTP-nya di-drop (handler menahan
+response melewati timeout orchestrator 10 s). Orchestrator menyimpulkan gagal dan
+menjalankan kompensasi penuh. Hasil **10/10 `compensated` dengan flag
+`needless_compensation`** — semua langkah sebenarnya sukses (tidak ada marker
+kegagalan), namun transaksi dibatalkan sia-sia (false negative).
+
+### Perbandingan S8 vs S9 — kedua pendekatan sama-sama rentan sinyal hilang
+
+| Aspek | S8 (choreography) | S9 (orchestration) |
+|-------|--------------------|--------------------|
+| Sinyal hilang | Event dipublish di-drop | Response HTTP di-drop setelah commit |
+| Konsistensi akhir | **0%** — saga stuck, Order menggantung | **100%** — semua dikompensasi |
+| Kategori outcome | inconsistent | compensated + needless |
+| Biaya kegagalan | Data meninggalkan state parsial permanen | Transaksi valid hilang (dibatalkan sia-sia) |
+
+Kesimpulan untuk RM1/RM2: **tidak ada pendekatan yang bebas dari kelemahan
+struktural terhadap hilangnya sinyal koordinasi** — choreography mengorbankan
+konsistensi data (stuck), orchestration mengorbankan transaksi yang valid
+(over-compensation). Perbedaannya: orchestration selalu berakhir konsisten
+(dengan biaya pembatalan), sedangkan choreography dapat meninggalkan data
+menggantung tanpa penyelesaian. Temuan ini selaras dengan analisis Malyuga et
+al. (2020) bahwa endpoint idempotent dan pemulihan state diperlukan pada
+sistem berbasis orchestrator.
 
 ## Observasi S4 & S5 (otomatis, 10 run)
 
@@ -154,13 +177,14 @@ pendekatan masing-masing.
 
 1. **Konsistensi data (RM1)**: setara pada kondisi normal (S1/S2/S3/S7: 100%
    keduanya) dan saat kompensasi gagal (S6: 0% keduanya). **Perbedaan muncul
-   pada mode kegagalan event loss (S8)** yang hanya mungkin terjadi di
-   choreography: saga stuck permanen (0%), sementara orchestration secara
-   struktural kebal terhadap kondisi ini.
+   pada mode kegagalan sinyal koordinasi hilang**: S8 (event di-drop,
+   choreography) → saga stuck, 0% konsisten; S9 (response di-drop,
+   orchestration) → fully compensated, 100% konsisten tetapi transaksi valid
+   dibatalkan sia-sia (needless).
 2. **Compensating transaction success rate (RM2)**: setara pada kompensasi
    normal (100% S2/S3) dan kegagalan kompensasi (0% S6). Pada S8 kompensasi
-   tidak terpicu sama sekali (tidak ada yang mengetahui kegagalan) — juga
-   hanya mungkin di choreography.
+   tidak terpicu sama sekali (tidak ada yang mengetahui kegagalan); pada S9
+   kompensasi berhasil penuh (100%) namun tidak diperlukan (false negative).
 3. **Recovery time (RM3)**: berbeda signifikan secara statistik (Mann-Whitney U)
    pada skenario kegagalan langkah — choreography lebih cepat (S2: 22,5 vs
    25,3 ms, p<0,001; S3: 18,0 vs 31,1 ms, p<0,0001). Magnitudo selisih kecil
@@ -178,7 +202,9 @@ pendekatan masing-masing.
 inkonsistensi sementara pendek, **orchestration** lebih tepat; untuk sistem
 yang menuntut tidak ada request yang hilang dan menghindari titik tunggal,
 **choreography** lebih tepat — dengan catatan perlu mekanisme outbox/event
-replay dan idempotensi pada kompensasi.
+replay (mencegah saga stuck pada event loss) dan idempotensi + verifikasi
+eksplisit pada kompensasi orchestration (mencegah pembatalan transaksi valid
+pada response loss).
 
 ## Catatan Metodologi
 

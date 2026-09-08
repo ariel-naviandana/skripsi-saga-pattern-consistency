@@ -92,6 +92,7 @@ Hasil JSON per iterasi tersimpan di `docs/runs/<Skenario>/<approach>/`.
 | S6 | Compensating Tx Failure | Both | Compensating transaction itself fails during rollback |
 | S7 | Concurrency 500 | Both | 500 concurrent transactions |
 | S8 | Event Loss (partial) | Choreography | First `order.created` event silently dropped (dual-write) |
+| S9 | Response Loss (in-doubt) | Orchestration | Step commits but HTTP response withheld → needless compensation |
 
 Detail: [docs/SCENARIOS.md](docs/SCENARIOS.md)
 

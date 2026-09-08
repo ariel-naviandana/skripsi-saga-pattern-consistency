@@ -15,6 +15,7 @@ type sagaResult struct {
 	LatencyMS      int64  `json:"latency_ms"`
 	RecoveryTimeMS *int64 `json:"recovery_time_ms,omitempty"`
 	InconsistencyMS *int64 `json:"inconsistency_ms,omitempty"`
+	Needless       bool   `json:"needless_compensation,omitempty"`
 }
 
 type runResult struct {
@@ -50,6 +51,7 @@ type agg struct {
 	InconsistencyMinMS float64 `json:"min_inconsistency_ms"`
 	InconsistencyMaxMS float64 `json:"max_inconsistency_ms"`
 	InconsistencyStdMS float64 `json:"std_inconsistency_ms"`
+	NeedlessCount      int     `json:"needless_compensation_count"`
 	LatencyAvgMS      float64 `json:"avg_latency_ms"`
 	LatencyMinMS      float64 `json:"min_latency_ms"`
 	LatencyMaxMS      float64 `json:"max_latency_ms"`
@@ -191,7 +193,7 @@ func main() {
 	flag.Parse()
 
 	var table []agg
-	scenarios := []string{"S1", "S2", "S3", "S6", "S7", "S8"}
+	scenarios := []string{"S1", "S2", "S3", "S6", "S7", "S8", "S9"}
 	approaches := []string{"choreography", "orchestration"}
 	metrics := []string{"latency", "inconsistency_window", "recovery_time"}
 
@@ -213,6 +215,7 @@ func main() {
 			}
 			var total runResult
 			runs := 0
+			needlessCount := 0
 			var runConsistency, runCompSuccess []float64
 			var latencies, recoveries, inconsistencies []float64
 			for _, f := range files {
@@ -256,6 +259,9 @@ func main() {
 						runInc += float64(*r.InconsistencyMS)
 						nInc++
 					}
+					if r.Needless {
+						needlessCount++
+					}
 				}
 				if nLat > 0 {
 					perRun[s][a]["latency"] = append(perRun[s][a]["latency"], runLat/float64(nLat))
@@ -295,6 +301,7 @@ func main() {
 				InconsistencyMinMS: incMin,
 				InconsistencyMaxMS: incMax,
 				InconsistencyStdMS: sampleStd(inconsistencies),
+				NeedlessCount:     needlessCount,
 				LatencyAvgMS:    mean(latencies),
 				LatencyMinMS:    latMin,
 				LatencyMaxMS:    latMax,
@@ -310,12 +317,12 @@ func main() {
 		return table[i].Approach < table[j].Approach
 	})
 
-	fmt.Println("Scenario | Approach | Runs | Txns | Committed | Compensated | Inconsistent | NotFound | Unrecorded | Consistency% | CompSuccess% | Rec# | AvgRec(ms) | MinRec | MaxRec | StdRec | Inc# | AvgInc(ms) | MinInc | MaxInc | StdInc | AvgLat(ms) | MinLat | MaxLat | StdLat")
-	fmt.Println("-------- | -------- | ---- | ---- | --------- | ----------- | ------------ | -------- | ---------- | ------------ | ------------ | ---- | ---------- | ------ | ------ | ------ | ---- | ---------- | ------ | ------ | ------ | ---------- | ------ | ------ | ------")
+	fmt.Println("Scenario | Approach | Runs | Txns | Committed | Compensated | Inconsistent | NotFound | Unrecorded | Needless | Consistency% | CompSuccess% | Rec# | AvgRec(ms) | MinRec | MaxRec | StdRec | Inc# | AvgInc(ms) | MinInc | MaxInc | StdInc | AvgLat(ms) | MinLat | MaxLat | StdLat")
+	fmt.Println("-------- | -------- | ---- | ---- | --------- | ----------- | ------------ | -------- | ---------- | -------- | ------------ | ------------ | ---- | ---------- | ------ | ------ | ------ | ---- | ---------- | ------ | ------ | ------ | ---------- | ------ | ------ | ------")
 	for _, a := range table {
-		fmt.Printf("%s | %s | %d | %d | %d | %d | %d | %d | %d | %.1f | %.1f | %d | %.0f | %.0f | %.0f | %.0f | %d | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f\n",
+		fmt.Printf("%s | %s | %d | %d | %d | %d | %d | %d | %d | %d | %.1f | %.1f | %d | %.0f | %.0f | %.0f | %.0f | %d | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f\n",
 			a.Scenario, a.Approach, a.Runs, a.Transactions, a.Committed, a.Compensated,
-			a.Inconsistent, a.NotFound, a.Unrecorded, a.ConsistencyRate, a.CompSuccessRate, a.RecoveryCount,
+			a.Inconsistent, a.NotFound, a.Unrecorded, a.NeedlessCount, a.ConsistencyRate, a.CompSuccessRate, a.RecoveryCount,
 			a.RecoveryAvgMS, a.RecoveryMinMS, a.RecoveryMaxMS, a.RecoveryStdMS,
 			a.InconsistencyCount, a.InconsistencyAvgMS, a.InconsistencyMinMS, a.InconsistencyMaxMS, a.InconsistencyStdMS,
 			a.LatencyAvgMS, a.LatencyMinMS, a.LatencyMaxMS, a.LatencyStdMS)

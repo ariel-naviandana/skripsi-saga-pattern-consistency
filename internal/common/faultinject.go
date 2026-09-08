@@ -9,23 +9,26 @@ import (
 // FaultConfig reads fault injection parameters from environment variables.
 // The middleware is non-intrusive: no service source changes between scenarios.
 type FaultConfig struct {
-	FailAtStep       string
-	FailAtAttempt    int
-	DelayMS          int
-	FailOnCompensate bool
-	DropEvent        string
-	attempt          atomic.Int32
-	dropped          atomic.Bool
+	FailAtStep        string
+	FailAtAttempt     int
+	DelayMS           int
+	FailOnCompensate  bool
+	DropEvent         string
+	DropResponseAtStep string
+	attempt           atomic.Int32
+	dropped           atomic.Bool
+	droppedResp       atomic.Bool
 }
 
 // NewFaultConfig builds a FaultConfig from the process environment.
 func NewFaultConfig() *FaultConfig {
 	fc := &FaultConfig{
-		FailAtStep:       EnvOr("FAIL_AT_STEP", ""),
-		FailAtAttempt:    EnvIntOr("FAIL_AT_ATTEMPT", 0),
-		DelayMS:          EnvIntOr("DELAY_MS", 0),
-		FailOnCompensate: EnvOr("FAIL_ON_COMPENSATE", "") == "true",
-		DropEvent:        EnvOr("DROP_EVENT", ""),
+		FailAtStep:        EnvOr("FAIL_AT_STEP", ""),
+		FailAtAttempt:     EnvIntOr("FAIL_AT_ATTEMPT", 0),
+		DelayMS:           EnvIntOr("DELAY_MS", 0),
+		FailOnCompensate:  EnvOr("FAIL_ON_COMPENSATE", "") == "true",
+		DropEvent:         EnvOr("DROP_EVENT", ""),
+		DropResponseAtStep: EnvOr("DROP_RESPONSE_AT_STEP", ""),
 	}
 	return fc
 }
@@ -34,6 +37,7 @@ func NewFaultConfig() *FaultConfig {
 func (f *FaultConfig) ResetAttempt() {
 	f.attempt.Store(0)
 	f.dropped.Store(false)
+	f.droppedResp.Store(false)
 }
 
 // Delay sleeps for DelayMS if configured.
@@ -55,6 +59,23 @@ func (f *FaultConfig) ShouldDropEvent(topic string) bool {
 		return false
 	}
 	log.Printf("faultinject: dropping event topic=%s", topic)
+	return true
+}
+
+// ShouldDropResponse reports whether the HTTP response for the given forward
+// step should be withheld (S9). It fires exactly once per process: the step
+// commits its business transaction normally, but the response never reaches
+// the orchestrator (the handler stalls past the orchestrator's timeout), so
+// the orchestrator treats the step as failed and starts compensation — even
+// though the operation actually succeeded (in-doubt / over-compensation).
+func (f *FaultConfig) ShouldDropResponse(step string) bool {
+	if f.DropResponseAtStep == "" || step != f.DropResponseAtStep {
+		return false
+	}
+	if f.droppedResp.Swap(true) {
+		return false
+	}
+	log.Printf("faultinject: dropping response step=%s", step)
 	return true
 }
 

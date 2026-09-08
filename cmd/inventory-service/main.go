@@ -32,7 +32,7 @@ func main() {
 
 	switch cfg.Approach {
 	case "orchestration":
-		bh := &httph.BusinessHandler{Inventory: biz}
+		bh := &httph.BusinessHandler{Inventory: biz, Fault: biz.Fault}
 		mux.HandleFunc("/inventory", bh.InventoryReserve)
 		mux.HandleFunc("/inventory/compensate", bh.InventoryCompensate)
 	default: // choreography
