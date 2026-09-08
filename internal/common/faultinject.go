@@ -15,6 +15,7 @@ type FaultConfig struct {
 	FailOnCompensate  bool
 	DropEvent         string
 	DropResponseAtStep string
+	SelectCompensate   bool
 	attempt           atomic.Int32
 	dropped           atomic.Bool
 	droppedResp       atomic.Bool
@@ -26,9 +27,10 @@ func NewFaultConfig() *FaultConfig {
 		FailAtStep:        EnvOr("FAIL_AT_STEP", ""),
 		FailAtAttempt:     EnvIntOr("FAIL_AT_ATTEMPT", 0),
 		DelayMS:           EnvIntOr("DELAY_MS", 0),
-		FailOnCompensate:  EnvOr("FAIL_ON_COMPENSATE", "") == "true",
+		FailOnCompensate:   EnvOr("FAIL_ON_COMPENSATE", "") == "true",
 		DropEvent:         EnvOr("DROP_EVENT", ""),
 		DropResponseAtStep: EnvOr("DROP_RESPONSE_AT_STEP", ""),
+		SelectCompensate:   EnvOr("SELECTIVE_COMPENSATE", "") == "true",
 	}
 	return fc
 }

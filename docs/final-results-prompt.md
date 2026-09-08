@@ -55,6 +55,7 @@ terlewat, (3) apa yang harus diperbaiki sebelum sidang. Jujur dan kritis.
 | S7 | 500 transaksi konkuren (15.000 total) | keduanya (30×) | 100% committed (choreo 15000/15000; orch 14918/15000 + 82 request ditolak — fluktuasi run-to-run tinggi); **window inkonsistensi 5152 vs 628 ms (p<0,0001)**; latency 8476 vs 5010 ms |
 | S8 | Event loss parsial (order.created di-drop diam-diam, broker hidup) | choreography (10×) | **10/10 inconsistent — saga STUCK permanen** (order committed, tak ada yang tahu, kompensasi tak terpicu) |
 | S9 | Response hilang / in-doubt (inventory commit sukses tapi response HTTP di-drop, orchestrator timeout) | orchestration (10×) | **10/10 compensated + needless_compensation=true** — konsistensi 100% tapi transaksi valid dibatalkan sia-sia |
+| S9s | S9 + SELECTIVE_COMPENSATE (orchestrator skip kompensasi untuk service yang tidak committed) | orchestration (10×) | **10/10 compensated** — hasil data identik dengan S9; selective membaca kebenaran DB, jadi orphaned commit (prediksi) tidak terjadi. Perbedaan call-all vs selective pada S9 murni efisiensi (1 HTTP call tambahan ke shipping yang no-op) |
 
 ## TEMUAN UTAMA (jawaban per RM)
 
@@ -80,10 +81,18 @@ berasal dari jalur eksekusi forward (hop Kafka), bukan pemulihan.
    p=0,73 (tidak signifikan), karena outlier 1626 ms menghilang. Tidak dipublikasikan
    sebagai temuan komparatif S1.
 2. **S7 orchestration unrecorded:** 82 (run sebelumnya 2) — fluktuasi run-to-run
-   besar; menunjukkan fenomena kejenuhan titik tunggal, namun bukan properti
-   desain sistemik yang stabil.
+   besar; mekanisme: Docker Desktop vpnkit/port-forwarder pada Windows
+   (TIME_WAIT/ephemeral port pool dengan burst 500 koneksi dalam <1 s memicu
+   intermittent refused).
 3. **Recovery time S2:** selisih choreography vs orchestration bergeser dari
    (22,5 vs 25,3 ms) ke (22,0 vs 28,7 ms) — tetap signifikan, arah sama.
+4. **S9 vs S9s (counterfactual):** S9s menjalankan strategi compensate-selective
+   untuk menguji apakah call-all design menghasilkan orphaned commit (prediksi
+   penilai independen). Hasil: **10/10 compensated, identik dengan S9** — orphaned
+   commit **tidak terjadi** karena selective membaca kebenaran DB. Perbedaan
+   call-all vs selective murni efisiensi (±30 ms latency tambahan). Caveat call-all
+   tetap valid untuk konteks S2/S3 (di mana call-all menambah jumlah HTTP call
+   dan berpotensi mempengaruhi recovery time), tapi belum diisolasi secara empiris.
 
 ## CAVEAT & KETERBATASAN YANG SUDAH DIDOKUMENTASIKAN
 

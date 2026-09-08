@@ -39,7 +39,8 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 | S7 | choreography | 15000 | 15000 | 0 | 100.0 | 5152 | 8476 |
 | S7 | orchestration | 15000 | 14918 | 82 | 99.5 | 628 | 5010 |
 | S8 | choreography | 10 | 0 | 0 | 0.0 (stuck) | 0 | 12345 |
-| S9 | orchestration | 10 | 0 (10 compensated) | 0 | 100.0 (needless) | 10043 | 10127 |
+| S9 | orchestration | 10 | 0 | 10 | 0 | 0 | 0 | 10 | 100.0 (needless) | 10043 | 10127 |
+| S9s | orchestration | 10 | 0 | 10 | 0 | 0 | 0 | 10 | 100.0 (needless) | 10084 | 10174 |
 
 \* Unrecorded = request yang gagal terkirim/mendapat respons di pintu masuk saat
 puncak beban (koneksi diputus paksa); transaksi tidak pernah dimulai, bukan
@@ -96,9 +97,19 @@ Kedua pendekatan konsisten penuh (100%). Periode inkonsistensi sementara
 berbeda signifikan secara statistik (choreography 41,5 ms vs orchestration 26,3 ms,
 p<0,0001), namun latency end-to-end **tidak berbeda signifikan** (Mann-Whitney U,
 p=0,73) setelah re-run final — klaim awal "S1 latency berbeda signifikan" terbukti
-tidak stabil di lintas run (didukung outlier tunggal pada pengukuran sebelumnya).
-S1 tidak menunjukkan perbandingan komparatif yang kuat untuk latency karena
-tidak ada kegagalan yang dieksploitasi.
+tidak stabil di lintas run.
+
+**Justifikasi outlier (1626 ms pada pengukuran awal):** outlier tunggal pada
+run ke-6 pengukuran choreography sebelumnya (satu dari 30 run, ~3%) merupakan
+kemungkinan **cold-start container**: urutan pertama POST setelah `docker compose
+up -d` mengaktifkan inisialisasi connection pool PostgreSQL, JIT compiler Go,
+dan TCP handshake pertama yang lebih lambat (~1–1,5 detik). Setelah run pertama,
+warm-up selesai dan latency turun ke rentang normal 80–250 ms. Fenomena ini
+khas untuk container yang baru start dan tidak mencerminkan performa steady-state
+sistem. Pada re-run final (run ke-2 dan seterusnya), warm-up sudah terjadi
+sebelumnya karena run-crash/run-scenario sebelumnya telah mengisi cache OS dan
+TCP TIME_WAIT. Outlier tersebut bukan temuan arsitektural melainkan artefak
+pengukuran urutan pertama, sehingga di-exclude dari klaim komparatif.
 
 ### S2 — Kegagalan Shipping (langkah akhir)
 Kompensasi berantai berhasil penuh di kedua pendekatan (CTSR 100%).
@@ -144,6 +155,25 @@ transaksi yang diproses. Perbedaan utama:
   run-to-run tinggi (run sebelumnya mencatat 2 unrecorded) menandakan bahwa
   kondisi mesin lebih berperan daripada desain sistemik.
 
+**Mekanisme fluktuasi 2 ↔ 82 request ditolak (S7 orchestration):** variasi
+run-to-run yang lebar pada kolom `Unrecorded` berasal dari **interaksi
+Docker Desktop pada Windows** dengan lalu lintas burst tinggi. Saat 500
+goroutine membuka koneksi ke `localhost:8080` secara bersamaan dalam <1 detik,
+port-forwarder Windows (vpnkit) meneruskan koneksi ke container orchestrator
+melalui mekanisme TCP/IP host. Pool koneksi host-side memiliki batas
+**ephemeral port** (~16.000) dan waktu tunggu **TIME_WAIT** (2–4 menit per
+koneksi). Pada run dengan kondisi OS favorable (cache hangat, port pool belum
+penuh), hampir semua koneksi diterima. Pada run dengan cache dingin atau
+akumulasi TIME_WAIT dari run sebelumnya, beberapa koneksi di-reset oleh kernel
+sebelum sampai ke orchestrator, sehingga klien workload menerima
+`connectex: actively refused`. Fenomena ini adalah **infrastruktur pengujian
+bukan sifat sistem saga**: dengan lingkungan produksi di Linux tanpa vpnkit
+atau dengan Kubernetes ingress yang mengelola connection pool, tingkat
+`Unrecorded` kemungkinan jauh lebih rendah. Namun untuk eksperimen ini,
+angka 82 (run ini) dan 2 (run sebelumnya) sama-sama menunjukkan bahwa **titik
+masuk tunggal orchestration rentan terhadap kehilangan request di puncak
+beban**, dan temuan kualitatifnya konsisten walau magnitudonya tidak stabil.
+
 ### S8 — Event Loss Parsial (choreography only)
 Mensimulasikan *dual-write problem*: order di-commit ke database, tetapi event
 `saga.order.created` di-drop di titik publish (producer melaporkan sukses).
@@ -158,6 +188,18 @@ response melewati timeout orchestrator 10 s). Orchestrator menyimpulkan gagal da
 menjalankan kompensasi penuh. Hasil **10/10 `compensated` dengan flag
 `needless_compensation`** — semua langkah sebenarnya sukses (tidak ada marker
 kegagalan), namun transaksi dibatalkan sia-sia (false negative).
+
+**Catatan penting — konsistensi ≠ correctness:** hasil S9 **100% konsisten secara
+status akhir data** (semua service mencapai status compensated), tetapi dari
+sudut pandang **pelanggan**, pesanan yang sebenarnya valid (order sukses, payment
+terdebet, stok berkurang) dihapus begitu saja karena sistem salah paham. Konsistensi
+data teknis ≠ kebenaran keputusan bisnis. Oleh karena itu, perbandingan "S8 (0%)
+vs S9 (100%) konsisten" bukan apples-to-apples di level metrik — S8 gagal
+mencapai state akhir sama sekali (stuck), sedangkan S9 mencapai state akhir
+konsisten tapi dengan membatalkan transaksi yang seharusnya sukses. **Keduanya
+sama-sama gagal dari perspektif pelanggan**: S8 meninggalkan data menggantung,
+S9 meninggalkan keputusan bisnis yang salah. Tidak ada pemenang di S8 vs S9 —
+yang ada adalah dua manifestasi berbeda dari kerentanan struktural yang sama.
 
 ### Perbandingan S8 vs S9 — kedua pendekatan sama-sama rentan sinyal hilang
 
@@ -176,6 +218,52 @@ konsistensi data (stuck), orchestration mengorbankan transaksi yang valid
 menggantung tanpa penyelesaian. Temuan ini selaras dengan analisis Malyuga et
 al. (2020) bahwa endpoint idempotent dan pemulihan state diperlukan pada
 sistem berbasis orchestrator.
+
+### S9s — Response Hilang dengan Compensate-Selective (orchestration only)
+
+**Counterfactual dari keputusan call-all.** S9s menjalankan skenario yang sama
+dengan S9, tetapi orchestrator menggunakan strategi **compensate-selective**
+(`SELECTIVE_COMPENSATE=true`): sebelum memanggil kompensasi untuk sebuah service,
+orchestrator **query database** untuk mengecek apakah service tersebut benar-benar
+memiliki row `committed`. Jika tidak ada, kompensasi **di-skip**. Tujuannya
+mengisolasi apakah strategi call-all (yang selalu memanggil keempat endpoint
+kompensasi) memang menghasilkan data outcome berbeda dengan selective (yang hanya
+memanggil yang committed).
+
+Hasil (10 run, orchestration): **10/10 `compensated`** — konsisten dengan S9
+(call-all). Pada S9s, shipping (yang tidak pernah commit) di-skip (terlihat dari
+log "skip compensate (not committed)"); order, payment, inventory (yang committed
+sebelum response di-drop) dikompensasi.
+
+**Temuan penting — prediksi orphaned commit tidak terjadi:** Claude (penilai
+independen) memprediksi bahwa selective compensation akan menghasilkan **orphaned
+commit** (data sukses tanpa kompensasi → inkonsistensi permanen). Hasil tidak
+mendukung prediksi tersebut. Alasannya: selective compensation membaca **kebenaran
+di database** (row `committed`), bukan keyakinan orchestrator. Langkah yang
+sebenarnya commit — termasuk yang kompensasinya "tidak perlu" (false negative)
+— tetap dikompensasi karena ada buktinya. Tidak ada skenario pada S9 di mana
+sebuah step commit tetapi orchestrator "tidak tahu" sampai-sampai skip
+kompensasi, karena selective logic selalu memverifikasi DB truth.
+
+**Implikasi untuk caveat call-all:** percobaan ini **memperkuat** bahwa
+desain call-all pada S9 bersifat konservatif-benign — baik call-all maupun
+selective menghasilkan outcome data identik (semua participating services
+`compensated`, 100% konsisten). Perbedaan call-all hanya berupa **HTTP call
+tambahan ke shipping** yang tidak participated (no-op, hanya menambah latency
+±30 ms). Konsekuensi desain call-all pada S9 murni **efisiensi**, bukan
+konsistensi. Caveat di paragraf sebelumnya tetap valid untuk konteks S2/S3
+di mana call-all membuat orchestrator mengirim lebih banyak HTTP call
+daripada yang strictly perlu, sehingga berpotensi mempengaruhi recovery time
+namun sulit diisolasi tanpa eksperimen S2s/S3s yang juga memerlukan selective
+mode.
+
+Latency S9s (10174 ± 203 ms) sedikit lebih tinggi dari S9 (10127 ± 15 ms) —
+tambahan overhead 4 query DB di `fail()` saat selective mode aktif. Untuk
+eksperimen S2/S3 (di mana recovery time terdefinisi dan call-all mungkin
+memberi kontribusi pada selisih), eksperimen S2s/S3s akan menjadi lanjutan
+yang diperlukan untuk mengisolasi confounding tersebut secara empiris.
+
+Data: `docs/runs/S9s/orchestration/`.
 
 **Caveat penting (konsekuensi desain, bukan properti universal):** hasil S9
 (100% konsisten, needless compensation) adalah konsekuensi langsung dari
@@ -253,6 +341,16 @@ pada response loss).
   `compensate_failed` ditemukan (saga "sealed").
 - Recovery time dihitung dari timestamp `saga_log` di database service, bukan
   dari polling workload generator, sehingga presisinya ±milidetik.
+- **Recovery time untuk S9 tidak terdefinisi (nol) bukan karena kelalaian** —
+  definisi proposal 3.5.3 membutuhkan titik deteksi kegagalan (timestamp row
+  `failed` di `saga_log`), lalu selisih ke final state konsisten. Pada S9,
+  orchestrator tidak pernah menulis row `failed` karena timeout terjadi di level
+  transport HTTP (di luar jangkauan saga_log); kompensasi dipicu oleh asumsi
+  "gagal" tanpa jejak eksplisit di database. Akibatnya, `recovery_count=0` di
+  S9 bukan data hilang tapi mencerminkan sifat mode kegagalannya (in-doubt
+  terdeteksi di luar saga_log). Perbandingan recovery time choreography vs
+  orchestration untuk S9 tidak dimungkinkan; ini batasan desain eksperimen, bukan
+  kelalaian implementasi.
 - Nilai latency S6 (±129–188 ms) mencerminkan waktu konfirmasi inkonsistensi,
   bukan waktu pemulihan (tidak ada pemulihan pada S6).
 

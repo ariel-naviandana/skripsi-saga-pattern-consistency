@@ -19,14 +19,15 @@ switch ($Scenario) {
   "S3" { $env:FAIL_AT_STEP = "inventory"; $env:FAIL_AT_ATTEMPT = "1"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "" }
   "S6" { $env:FAIL_AT_STEP = "inventory"; $env:FAIL_AT_ATTEMPT = "1"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "true"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "" }
   "S8" { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = "saga.order.created"; $env:DROP_RESPONSE_AT_STEP = "" }
-  "S9" { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "inventory" }
+  "S9" { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "inventory"; $env:SELECTIVE_COMPENSATE = "false" }
+  "S9s" { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "inventory"; $env:SELECTIVE_COMPENSATE = "true" }
   default { throw "unsupported scenario $Scenario" }
 }
 
 $count = if ($Scenario -eq "S7") { 500 } else { 1 }
 
 Write-Host "Scenario: $Scenario / $Approach / $Runs runs"
-Write-Host "Fault: FAIL_AT_STEP=$env:FAIL_AT_STEP FAIL_AT_ATTEMPT=$env:FAIL_AT_ATTEMPT FAIL_ON_COMPENSATE=$env:FAIL_ON_COMPENSATE DROP_EVENT=$env:DROP_EVENT DROP_RESPONSE_AT_STEP=$env:DROP_RESPONSE_AT_STEP"
+Write-Host "Fault: FAIL_AT_STEP=$env:FAIL_AT_STEP FAIL_AT_ATTEMPT=$env:FAIL_AT_ATTEMPT FAIL_ON_COMPENSATE=$env:FAIL_ON_COMPENSATE DROP_EVENT=$env:DROP_EVENT DROP_RESPONSE_AT_STEP=$env:DROP_RESPONSE_AT_STEP SELECTIVE_COMPENSATE=$env:SELECTIVE_COMPENSATE"
 
 $env:APPROACH = $Approach
 

@@ -8,7 +8,9 @@ import (
 
 	"github.com/ariel-naviandana/skripsi-saga-pattern-consistency/internal/common"
 	"github.com/ariel-naviandana/skripsi-saga-pattern-consistency/internal/orchestration"
+	"github.com/ariel-naviandana/skripsi-saga-pattern-consistency/pkg/postgres"
 	"github.com/ariel-naviandana/skripsi-saga-pattern-consistency/pkg/redis"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func main() {
@@ -21,12 +23,32 @@ func main() {
 	}
 	defer rdb.Close()
 
+	fc := common.NewFaultConfig()
+
 	orch := orchestration.New(
 		"http://order-service:8081",
 		"http://payment-service:8082",
 		"http://inventory-service:8083",
 		"http://shipping-service:8084",
 		rdb,
+		fc,
+	)
+
+	// Wire service databases for SELECTIVE_COMPENSATE (S9s); connections
+	// are cheap to keep open and unused when the flag is off.
+	openDB := func(dsn postgres.Config) *pgxpool.Pool {
+		p, err := postgres.NewPool(ctx, dsn)
+		if err != nil {
+			log.Printf("orchestrator: db %s:%d (continuing without selective compensate): %v", dsn.Host, dsn.Port, err)
+			return nil
+		}
+		return p
+	}
+	orch.SetDBs(
+		openDB(common.ServiceDSN(common.ServiceOrder)),
+		openDB(common.ServiceDSN(common.ServicePayment)),
+		openDB(common.ServiceDSN(common.ServiceInventory)),
+		openDB(common.ServiceDSN(common.ServiceShipping)),
 	)
 
 	mux := http.NewServeMux()

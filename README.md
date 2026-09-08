@@ -93,6 +93,7 @@ Hasil JSON per iterasi tersimpan di `docs/runs/<Skenario>/<approach>/`.
 | S7 | Concurrency 500 | Both | 500 concurrent transactions |
 | S8 | Event Loss (partial) | Choreography | First `order.created` event silently dropped (dual-write) |
 | S9 | Response Loss (in-doubt) | Orchestration | Step commits but HTTP response withheld → needless compensation |
+| S9s | Response Loss + Selective Compensate | Orchestration | Same as S9 but orchestrator skips compensation for non-committed steps |
 
 Detail: [docs/SCENARIOS.md](docs/SCENARIOS.md)
 

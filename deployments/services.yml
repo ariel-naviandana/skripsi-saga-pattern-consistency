@@ -104,6 +104,7 @@ services:
     container_name: saga-orchestrator
     environment:
       PORT: "8080"
+      SELECTIVE_COMPENSATE: "${SELECTIVE_COMPENSATE:-false}"
     ports:
       - "8080:8080"
     networks:

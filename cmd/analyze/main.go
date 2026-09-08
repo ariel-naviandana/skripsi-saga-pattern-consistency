@@ -193,7 +193,7 @@ func main() {
 	flag.Parse()
 
 	var table []agg
-	scenarios := []string{"S1", "S2", "S3", "S6", "S7", "S8", "S9"}
+	scenarios := []string{"S1", "S2", "S3", "S6", "S7", "S8", "S9", "S9s"}
 	approaches := []string{"choreography", "orchestration"}
 	metrics := []string{"latency", "inconsistency_window", "recovery_time"}
 
