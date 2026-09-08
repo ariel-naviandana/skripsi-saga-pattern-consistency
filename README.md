@@ -67,6 +67,7 @@ docker compose up -d order-service payment-service inventory-service shipping-se
 ```powershell
 .\scripts\run-scenario.ps1 -Scenario S1 -Approach choreography -Runs 30
 .\scripts\run-scenario.ps1 -Scenario S3 -Approach orchestration -Runs 30
+.\scripts\run-scenario.ps1 -Scenario S8 -Approach choreography -Runs 10
 ```
 
 Skenario crash (S4/S5) otomatis — stop container di tengah transaksi
@@ -90,6 +91,7 @@ Hasil JSON per iterasi tersimpan di `docs/runs/<Skenario>/<approach>/`.
 | S5 | Kafka Down | Choreography | Kafka forcibly stopped during event publish |
 | S6 | Compensating Tx Failure | Both | Compensating transaction itself fails during rollback |
 | S7 | Concurrency 500 | Both | 500 concurrent transactions |
+| S8 | Event Loss (partial) | Choreography | First `order.created` event silently dropped (dual-write) |
 
 Detail: [docs/SCENARIOS.md](docs/SCENARIOS.md)
 

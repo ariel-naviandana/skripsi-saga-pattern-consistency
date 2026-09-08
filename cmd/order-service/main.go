@@ -36,7 +36,7 @@ func main() {
 		mux.HandleFunc("/orders/process", bh.OrderProcess)
 		mux.HandleFunc("/orders/compensate", bh.OrderCompensate)
 	default: // choreography
-		producer, err := choreography.NewProducer(cfg.KafkaBrokers)
+		producer, err := choreography.NewProducer(cfg.KafkaBrokers, biz.Fault)
 		if err != nil {
 			log.Fatalf("order: kafka producer: %v", err)
 		}

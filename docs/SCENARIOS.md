@@ -30,9 +30,24 @@ Saat kompensasi gagal, ditulis `compensate_failed`.
 | S5 | Kafka Down | hentikan container `saga-kafka` saat event dipublikasikan | `inconsistent` (partial commit) |
 | S6 | Kegagalan Compensating Tx | `FAIL_AT_STEP=inventory`, `FAIL_AT_ATTEMPT=1`, `FAIL_ON_COMPENSATE=true` | `inconsistent` |
 | S7 | Konkurensi 500 Transaksi | tidak ada, 500 request bersamaan | `committed` (semua) |
+| S8 | Event Loss Parsial | `DROP_EVENT=saga.order.created` (choreography) | `inconsistent` (stuck) |
 
-Catatan: S4 hanya untuk orchestration, S5 hanya untuk choreography (bergantung
+Catatan: S4 hanya untuk orchestration, S5 dan S8 hanya untuk choreography (bergantung
 komponen yang hanya ada di pendekatan tersebut).
+
+### S8 — Event Loss Parsial (choreography only)
+
+Mensimulasikan *dual-write / non-transactional queuing problem* (Laigner et al., 2021):
+database order berhasil di-commit tetapi event `saga.order.created` **sengaja di-drop**
+di titik publish (producer melaporkan sukses, pesan tidak pernah sampai ke broker).
+Broker Kafka tetap hidup; hanya 1 event pertama yang hilang (`DROP_EVENT`,
+one-shot via atomic flag di `FaultConfig.ShouldDropEvent`).
+
+Hasil (10 run): **10/10 inconsistent** — Order `committed`, Payment/Inventory/Shipping
+tidak berpartisipasi, tidak ada marker kegagalan sehingga kompensasi tidak terpicu;
+saga **stuck permanen** tanpa mekanisme yang menyelamatkan (tanpa outbox/replay).
+Orchestration secara struktural kebal terhadap kondisi ini (pemanggilan HTTP langsung,
+tanpa broker perantara). Data: `docs/runs/S8/choreography/`.
 
 ## Menjalankan Skenario
 
@@ -115,15 +130,18 @@ Data lengkap: [docs/REPORT.md](REPORT.md) dan `docs/runs/summary.json`.
 | S3 | compensated (100%) | compensated (100%) |
 | S6 | inconsistent (100%) | inconsistent (100%) |
 | S7 (500×30) | committed (100%, 15000/15000) | committed (100%, 14998/15000; 2 request unrecorded) |
-| S4 | — | inconsistent (partial, manual) |
-| S5 | inconsistent (partial, manual) | — |
+| S8 (10) | inconsistent (100%, stuck — event order.created di-drop) | — |
+| S4 | — | inconsistent (partial, 10/10 otomatis) |
+| S5 | inconsistent (partial, 10/10 otomatis) | — |
 
 ### Metrik tambahan (kode final)
 
-- **Recovery time** (deteksi kegagalan → final konsisten): setara antar
-  pendekatan — S2: 22 vs 25 ms, S3: 18 vs 31 ms.
-- **Periode inkonsistensi sementara** (saga_log pertama → terakhir): setara pada
-  beban rendah (±31–49 ms); pada S7 choreography ±6238 ms vs orchestration
-  ±864 ms (rantai Kafka serial).
-- Latency end-to-end: orchestration lebih rendah pada S2/S3/S7; perbedaan
-  berasal dari jalur eksekusi, bukan kecepatan pemulihan.
+- **Recovery time** (deteksi kegagalan → final konsisten): berbeda signifikan
+  secara statistik (Mann-Whitney U) — choreography lebih cepat: S2: 22 vs 25 ms
+  (p<0,001), S3: 18 vs 31 ms (p<0,0001). Magnitudo kecil; keduanya pulih dalam
+  puluhan milidetik.
+- **Periode inkonsistensi sementara** (saga_log pertama → terakhir): tidak
+  berbeda signifikan pada beban rendah (S1/S2); pada S7 choreography ±6238 ms vs
+  orchestration ±864 ms (p<0,0001) karena rantai Kafka serial.
+- Latency end-to-end: berbeda signifikan — choreography lebih lambat pada
+  S2/S3/S7; perbedaan berasal dari jalur eksekusi, bukan kecepatan pemulihan.

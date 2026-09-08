@@ -36,7 +36,7 @@ func main() {
 		mux.HandleFunc("/inventory", bh.InventoryReserve)
 		mux.HandleFunc("/inventory/compensate", bh.InventoryCompensate)
 	default: // choreography
-		producer, err := choreography.NewProducer(cfg.KafkaBrokers)
+		producer, err := choreography.NewProducer(cfg.KafkaBrokers, biz.Fault)
 		if err != nil {
 			log.Fatalf("inventory: kafka producer: %v", err)
 		}

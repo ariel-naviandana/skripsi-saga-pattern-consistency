@@ -56,6 +56,20 @@ type agg struct {
 	LatencyStdMS      float64 `json:"std_latency_ms"`
 }
 
+// sigResult is one Mann-Whitney U comparison (choreography vs orchestration)
+// for a metric within a scenario, using per-run means as observations.
+type sigResult struct {
+	Scenario    string  `json:"scenario"`
+	Metric      string  `json:"metric"`
+	ChoreoMean  float64 `json:"choreo_mean_ms"`
+	ChoreoStd   float64 `json:"choreo_std_ms"`
+	OrchMean    float64 `json:"orch_mean_ms"`
+	OrchStd     float64 `json:"orch_std_ms"`
+	U           float64 `json:"u_statistic"`
+	PValue      float64 `json:"p_value"`
+	Significant bool    `json:"significant_alpha_005"`
+}
+
 func mean(v []float64) float64 {
 	if len(v) == 0 {
 		return 0
@@ -96,13 +110,99 @@ func sampleStd(v []float64) float64 {
 	return math.Sqrt(s / float64(len(v)-1))
 }
 
+// normCDF is the standard normal cumulative distribution function.
+func normCDF(z float64) float64 {
+	return 0.5 * (1 + math.Erf(z/math.Sqrt2))
+}
+
+// mannWhitneyU performs the two-sided Mann-Whitney U test using the normal
+// approximation with continuity correction and tie correction (valid for
+// n1, n2 >= 8, which holds for our 30-run samples). Returns the U statistic
+// for sample x and the two-tailed p-value.
+func mannWhitneyU(x, y []float64) (float64, float64) {
+	n1, n2 := len(x), len(y)
+	if n1 < 8 || n2 < 8 {
+		return 0, math.NaN()
+	}
+	type item struct {
+		val float64
+		grp int
+	}
+	combined := make([]item, 0, n1+n2)
+	for _, v := range x {
+		combined = append(combined, item{v, 0})
+	}
+	for _, v := range y {
+		combined = append(combined, item{v, 1})
+	}
+	sort.Slice(combined, func(i, j int) bool { return combined[i].val < combined[j].val })
+
+	ranks := make([]float64, len(combined))
+	for i := 0; i < len(combined); {
+		j := i
+		for j+1 < len(combined) && combined[j+1].val == combined[i].val {
+			j++
+		}
+		avg := float64(i+j+2) / 2
+		for k := i; k <= j; k++ {
+			ranks[k] = avg
+		}
+		i = j + 1
+	}
+	var r1 float64
+	for i, it := range combined {
+		if it.grp == 0 {
+			r1 += ranks[i]
+		}
+	}
+	u1 := r1 - float64(n1*(n1+1))/2
+	u := u1
+
+	mu := float64(n1*n2) / 2
+	n := float64(n1 + n2)
+
+	var tieSum float64
+	for i := 0; i < len(combined); {
+		j := i
+		for j+1 < len(combined) && combined[j+1].val == combined[i].val {
+			j++
+		}
+		t := float64(j - i + 1)
+		tieSum += t*t*t - t
+		i = j + 1
+	}
+	sd := math.Sqrt(float64(n1*n2) / (n * (n - 1)) * ((n*n*n - n - tieSum) / 12))
+	if sd == 0 {
+		return u, math.NaN()
+	}
+	z := (u - mu + 0.5) / sd
+	if u > mu {
+		z = (u - mu - 0.5) / sd
+	}
+	p := 2 * (1 - normCDF(math.Abs(z)))
+	if p > 1 {
+		p = 1
+	}
+	return u, p
+}
+
 func main() {
 	dir := flag.String("dir", "docs/runs", "runs directory")
 	flag.Parse()
 
 	var table []agg
-	scenarios := []string{"S1", "S2", "S3", "S6", "S7"}
+	scenarios := []string{"S1", "S2", "S3", "S6", "S7", "S8"}
 	approaches := []string{"choreography", "orchestration"}
+	metrics := []string{"latency", "inconsistency_window", "recovery_time"}
+
+	// perRun[scenario][approach][metric] = per-run means (n = runs).
+	perRun := map[string]map[string]map[string][]float64{}
+	for _, s := range scenarios {
+		perRun[s] = map[string]map[string][]float64{}
+		for _, a := range approaches {
+			perRun[s][a] = map[string][]float64{}
+		}
+	}
 
 	for _, s := range scenarios {
 		for _, a := range approaches {
@@ -140,14 +240,31 @@ func main() {
 					runCompSuccess = append(runCompSuccess,
 						float64(rr.Compensated)/float64(attempts)*100)
 				}
+				var runLat, runRec, runInc float64
+				var nLat, nRec, nInc int
 				for _, r := range rr.Results {
 					latencies = append(latencies, float64(r.LatencyMS))
+					runLat += float64(r.LatencyMS)
+					nLat++
 					if r.RecoveryTimeMS != nil {
 						recoveries = append(recoveries, float64(*r.RecoveryTimeMS))
+						runRec += float64(*r.RecoveryTimeMS)
+						nRec++
 					}
 					if r.InconsistencyMS != nil {
 						inconsistencies = append(inconsistencies, float64(*r.InconsistencyMS))
+						runInc += float64(*r.InconsistencyMS)
+						nInc++
 					}
+				}
+				if nLat > 0 {
+					perRun[s][a]["latency"] = append(perRun[s][a]["latency"], runLat/float64(nLat))
+				}
+				if nRec > 0 {
+					perRun[s][a]["recovery_time"] = append(perRun[s][a]["recovery_time"], runRec/float64(nRec))
+				}
+				if nInc > 0 {
+					perRun[s][a]["inconsistency_window"] = append(perRun[s][a]["inconsistency_window"], runInc/float64(nInc))
 				}
 			}
 			if runs == 0 {
@@ -207,4 +324,40 @@ func main() {
 	out, _ := json.MarshalIndent(table, "", "  ")
 	os.WriteFile(filepath.Join(*dir, "summary.json"), out, 0o644)
 	fmt.Println("\nSummary written to", filepath.Join(*dir, "summary.json"))
+
+	// Mann-Whitney U comparisons (choreography vs orchestration) per metric.
+	var sigs []sigResult
+	for _, s := range scenarios {
+		for _, m := range metrics {
+			x := perRun[s]["choreography"][m]
+			y := perRun[s]["orchestration"][m]
+			if len(x) < 8 || len(y) < 8 {
+				continue
+			}
+			u, p := mannWhitneyU(x, y)
+			sigs = append(sigs, sigResult{
+				Scenario:    s,
+				Metric:      m,
+				ChoreoMean:  mean(x),
+				ChoreoStd:   sampleStd(x),
+				OrchMean:    mean(y),
+				OrchStd:     sampleStd(y),
+				U:           u,
+				PValue:      p,
+				Significant: p < 0.05,
+			})
+		}
+	}
+
+	fmt.Println("\nMann-Whitney U (choreography vs orchestration, per-run means, alpha=0.05)")
+	fmt.Println("Scenario | Metric | Choreo mean(ms) | Choreo std | Orch mean(ms) | Orch std | U | p-value | Significant")
+	fmt.Println("-------- | ------ | --------------- | ---------- | ------------- | -------- | ------ | ------- | -----------")
+	for _, s := range sigs {
+		fmt.Printf("%s | %s | %.1f | %.1f | %.1f | %.1f | %.1f | %.4f | %v\n",
+			s.Scenario, s.Metric, s.ChoreoMean, s.ChoreoStd, s.OrchMean, s.OrchStd, s.U, s.PValue, s.Significant)
+	}
+
+	sigOut, _ := json.MarshalIndent(sigs, "", "  ")
+	os.WriteFile(filepath.Join(*dir, "significance.json"), sigOut, 0o644)
+	fmt.Println("\nSignificance written to", filepath.Join(*dir, "significance.json"))
 }

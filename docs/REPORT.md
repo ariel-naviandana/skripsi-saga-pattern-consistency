@@ -38,10 +38,44 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 |----------|----------|------|-----------|-------------|--------------|---------------------------|--------------|
 | S7 | choreography | 15000 | 15000 | 0 | 100.0 | 6238 | 9722 |
 | S7 | orchestration | 15000 | 14998 | 2 | 100.0 | 864 | 5241 |
+| S8 | choreography | 10 | 0 | 0 | 0.0 (stuck) | 0 | 12811 |
 
 \* Unrecorded = request yang gagal terkirim/mendapat respons di pintu masuk saat
 puncak beban (koneksi diputus paksa); transaksi tidak pernah dimulai, bukan
-inkonsistensi data.
+inkonsistensi data. S8 (event loss) dijalankan 10× untuk observasi; latency-nya
+mencakup window konfirmasi quiescence (±10 detik) karena saga tidak pernah selesai.
+
+## Uji Signifikansi Statistik (Mann-Whitney U)
+
+Perbandingan choreography vs orchestration per skenario menggunakan
+**Mann-Whitney U test** (non-parametrik, dua sisi, α=0,05) pada mean per run
+(n=30 per pendekatan; menghindari pseudo-replication pada S7). Data mentah di
+`docs/runs/significance.json`.
+
+| Skenario | Metrik | Choreo (ms) | Orchestr. (ms) | p-value | Signifikan |
+|----------|--------|-------------|----------------|---------|------------|
+| S1 | latency | 165,2 ± 276,2 | 154,1 ± 29,2 | <0,0001 | ya |
+| S1 | inconsistency window | 30,8 ± 4,9 | 30,6 ± 8,4 | 0,2178 | tidak |
+| S2 | latency | 1638,7 ± 16,3 | 160,2 ± 16,6 | <0,0001 | ya |
+| S2 | inconsistency window | 48,0 ± 9,2 | 48,8 ± 6,6 | 0,3493 | tidak |
+| S2 | **recovery time** | **22,5 ± 3,8** | **25,3 ± 3,5** | **0,0004** | **ya** |
+| S3 | latency | 1670,2 ± 48,3 | 173,1 ± 21,1 | <0,0001 | ya |
+| S3 | inconsistency window | 36,8 ± 8,1 | 48,8 ± 12,6 | <0,0001 | ya |
+| S3 | **recovery time** | **18,0 ± 4,5** | **31,1 ± 7,9** | **<0,0001** | **ya** |
+| S6 | latency | 128,5 ± 13,6 | 188,0 ± 39,5 | <0,0001 | ya |
+| S6 | inconsistency window | 24,5 ± 5,3 | 50,0 ± 18,1 | <0,0001 | ya |
+| S7 | latency | 9721,6 ± 823,8 | 5240,7 ± 794,6 | <0,0001 | ya |
+| S7 | inconsistency window | 6238,0 ± 912,9 | 863,7 ± 313,7 | <0,0001 | ya |
+
+**Interpretasi:**
+- **Recovery time (S2/S3)**: perbedaan **signifikan** — choreography pulih lebih
+  cepat (p<0,001). Magnitudo kecil (±3–13 ms); secara praktis keduanya pulih
+  dalam puluhan milidetik. Klaim "setara" yang dilaporkan pada pengukuran awal
+  **dikoreksi**: secara statistik tidak setara, melainkan choreography lebih
+  cepat — sejalan dengan klaim Malyuga et al. (2020).
+- **Window inkonsistensi beban rendah (S1/S2)**: tidak berbeda signifikan.
+- **Latency & window inkonsistensi beban tinggi (S7)**: berbeda signifikan,
+  orchestration jauh lebih cepat/singkat.
 
 ## Analisis per Skenario
 
@@ -51,15 +85,18 @@ identik (±31 ms) dan latency seimbang (±165 vs ±154 ms).
 
 ### S2 — Kegagalan Shipping (langkah akhir)
 Kompensasi berantai berhasil penuh di kedua pendekatan (CTSR 100%).
-**Recovery time setara** (±22 vs ±25 ms) — mekanisme pemulihan sama cepatnya.
-Perbedaan latency end-to-end (±1639 vs ±160 ms) berasal dari jalur eksekusi
-forward choreography yang melewati beberapa hop Kafka, bukan dari kecepatan
-pemulihan.
+**Recovery time berbeda signifikan secara statistik** (Mann-Whitney U, p<0,001):
+choreography 22,5 ms vs orchestration 25,3 ms — choreography lebih cepat, namun
+magnitudo selisih kecil (±3 ms). Perbedaan latency end-to-end (±1639 vs ±160 ms)
+jauh lebih besar dan berasal dari jalur eksekusi forward choreography yang melewati
+beberapa hop Kafka, bukan dari kecepatan pemulihan.
 
 ### S3 — Kegagalan Inventory (langkah tengah)
-Pola sama dengan S2: kompensasi penuh (100%), **recovery time setara** bahkan
-sedikit lebih cepat di choreography (±18 vs ±31 ms). Periode inkonsistensi
-sementara juga setara (±37 vs ±49 ms).
+Pola sama dengan S2: kompensasi penuh (100%), **recovery time berbeda signifikan**
+(p<0,0001): choreography 18,0 ms vs orchestration 31,1 ms — choreography lebih cepat
+(selisih ±13 ms). Periode inkonsistensi sementara juga berbeda signifikan (36,8 vs
+48,8 ms, p<0,0001). Arah temuan ini mendukung klaim Malyuga et al. (2020) bahwa
+choreography bekerja lebih cepat pada mekanisme koordinasinya.
 
 ### S6 — Kegagalan Compensating Transaction
 Kedua pendekatan **tidak** dapat memulihkan konsistensi (0%). Compensating
@@ -80,6 +117,18 @@ transaksi yang diproses. Perbedaan utama:
 - **Availability pintu masuk**: choreography memproses seluruh 15.000 transaksi;
   orchestration kehilangan 2 request (0.01%) saat puncak beban karena entry
   point tunggalnya (orchestrator + port forward) menolak koneksi.
+
+### S8 — Event Loss Parsial (choreography only)
+Mensimulasikan *dual-write problem*: order di-commit ke database, tetapi event
+`saga.order.created` di-drop di titik publish (producer melaporkan sukses).
+Hasil **10/10 inconsistent** — saga stuck permanen: Order `committed`, service
+lain tidak berpartisipasi, tidak ada marker kegagalan sehingga kompensasi tidak
+terpicu dan tidak ada mekanisme (outbox/replay) yang menyelamatkannya.
+**Temuan kunci untuk RM1/RM2**: kondisi ini — yang paling sering disebut di
+literatur sebagai titik lemah choreography — tidak dapat dialami orchestration
+secara struktural (pemanggilan HTTP langsung tanpa broker perantara). Dengan
+S8, perbedaan RM1/RM2 menjadi nyata: **setara dalam kondisi normal, berbeda
+pada mode kegagalan event loss yang hanya mungkin terjadi di choreography**.
 
 ## Observasi S4 & S5 (otomatis, 10 run)
 
@@ -103,21 +152,24 @@ pendekatan masing-masing.
 
 ## Perbandingan & Rekomendasi
 
-1. **Konsistensi data (RM1)**: kedua pendekatan **setara** — keduanya 100%
-   konsisten pada semua skenario yang dapat pulih (S1/S2/S3/S7) dan keduanya
-   0% saat kompensasi gagal (S6). Tidak ada pendekatan yang lebih unggul dalam
-   menjaga konsistensi akhir.
-2. **Compensating transaction success rate (RM2)**: setara (100% pada S2/S3,
-   0% pada S6). Kelemahan saga terletak pada compensating transaction itu
-   sendiri, bukan pada mekanisme koordinasi.
-3. **Recovery time (RM3)**: setara (±18–31 ms) pada kegagalan langkah.
-   Klaim awal "orchestration 4–5× lebih cepat pulih" tidak terdukung ketika
-   recovery time diukur sesuai definisi (deteksi kegagalan → final konsisten);
-   perbedaan latency yang besar justru berasal dari jalur eksekusi, bukan
-   pemulihan.
-4. **Periode inkonsistensi sementara**: setara pada beban rendah (±37–49 ms),
-   tetapi **±7× lebih lama di choreography pada beban tinggi** (±6,2 s vs
-   ±0,9 s) karena serialisasi rantai event.
+1. **Konsistensi data (RM1)**: setara pada kondisi normal (S1/S2/S3/S7: 100%
+   keduanya) dan saat kompensasi gagal (S6: 0% keduanya). **Perbedaan muncul
+   pada mode kegagalan event loss (S8)** yang hanya mungkin terjadi di
+   choreography: saga stuck permanen (0%), sementara orchestration secara
+   struktural kebal terhadap kondisi ini.
+2. **Compensating transaction success rate (RM2)**: setara pada kompensasi
+   normal (100% S2/S3) dan kegagalan kompensasi (0% S6). Pada S8 kompensasi
+   tidak terpicu sama sekali (tidak ada yang mengetahui kegagalan) — juga
+   hanya mungkin di choreography.
+3. **Recovery time (RM3)**: berbeda signifikan secara statistik (Mann-Whitney U)
+   pada skenario kegagalan langkah — choreography lebih cepat (S2: 22,5 vs
+   25,3 ms, p<0,001; S3: 18,0 vs 31,1 ms, p<0,0001). Magnitudo selisih kecil
+   (±3–13 ms) dan keduanya pulih dalam puluhan milidetik. Klaim awal
+   "orchestration jauh lebih cepat pulih" tidak terdukung; perbedaan latency
+   yang besar berasal dari jalur eksekusi, bukan pemulihan.
+4. **Periode inkonsistensi sementara**: tidak berbeda signifikan pada S1/S2
+   (31/31 dan 48/49 ms), tetapi **±7× lebih lama di choreography pada beban
+   tinggi** (S7: 6238 vs 864 ms, p<0,0001) karena serialisasi rantai event.
 5. **Skalabilitas & titik tunggal**: choreography memproses seluruh transaksi
    tanpa kehilangan request namun lambat; orchestration lebih cepat namun entry
    point tunggalnya dapat menolak request pada puncak beban.
@@ -144,6 +196,8 @@ replay dan idempotensi pada kompensasi.
 
 ## Rekomendasi Langkah Selanjutnya
 
+- Menambahkan mekanisme **outbox pattern / event replay** di choreography dan
+  mengukur dampaknya terhadap S8 (event loss).
 - Menambahkan retry pada compensating transaction dan mengukur dampaknya
   terhadap S6.
 - Eksperimen dengan partisi Kafka > 1 untuk mengamati pengaruh paralelisme

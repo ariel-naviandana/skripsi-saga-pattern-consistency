@@ -36,7 +36,7 @@ func main() {
 		mux.HandleFunc("/shipments", bh.ShippingSchedule)
 		mux.HandleFunc("/shipments/compensate", bh.ShippingCompensate)
 	default: // choreography
-		producer, err := choreography.NewProducer(cfg.KafkaBrokers)
+		producer, err := choreography.NewProducer(cfg.KafkaBrokers, biz.Fault)
 		if err != nil {
 			log.Fatalf("shipping: kafka producer: %v", err)
 		}
