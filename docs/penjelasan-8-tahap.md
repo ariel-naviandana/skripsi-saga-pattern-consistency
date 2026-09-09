@@ -298,10 +298,16 @@ ubah kode.
 | **S2s recovery** | — | **28 ± 6 ms** (stabil tanpa outlier, n=30) | counterfactual RM3 |
 | **S3s recovery** | — | **24 ± 8 ms** | counterfactual RM3, n=30 |
 
-**Isolasi confounding RM3:**
-- S3 (call-all) recovery: 26,0 ms
-- S3s (selective compensate) recovery: 28 ms
-- **Selisih 2 ms** (di dalam std dev) → call-all tidak menambah overhead terukur
+**Isolasi confounding RM3 (MWU per pasangan, n=30):**
+- **S2 vs S2s (recovery_time):** Call-All 28,7 ± 6,4 ms vs Selective 27,8 ± 6,4 ms;
+  p=0,5046 → **tidak signifikan** (confounding terisolasi).
+- **S3 vs S3s (recovery_time):** Call-All 26,0 ± 6,5 ms vs Selective 24,2 ± 7,6 ms;
+  p=0,0359 → **signifikan** (selective 2 ms lebih cepat — confounding berkontribusi
+  kecil tapi ada).
+- **S9 vs S9s (latency):** Call-All 10158,9 ± 41,6 ms vs Selective 10130,1 ± 18,5 ms;
+  p=0,0013 → **signifikan** (selective 29 ms lebih cepat). Selective memberikan
+  sedikit keuntungan latency, namun magnitudo sangat kecil sehingga tidak
+  mengubah outcome data (keduanya 100% compensated).
 
 ### FAQ Tahap 7
 
@@ -357,7 +363,7 @@ ubah kode.
 |-----------------|-------------|------------|------|
 | **RM1** (Konsistensi data) | S1, S2, S3, S6, S7, S8, S9, S9s, S4, S5 (semua skenario) | Setara di kondisi normal; beda karakter di S8 (stuck) vs S9 (needless). Batas fundamental di S6 (0%). | 8/10 |
 | **RM2** (CTSR) | S2, S3, S6, S9, S9s | Setara: 100% di S2/S3/S9, 0% di S6. Kelemahan ada di compensating transaction itu sendiri. | 7/10 |
-| **RM3** (Recovery time) | S2, S3, S2s, S3s | Choreography **signifikan lebih cepat** (S2: 22 vs 29 ms p=0.0002; S3: 13 vs 26 ms p<0.0001). Confounding call-all sudah **diisolasi empiris** via S2s/S3s (n=30, selisih dalam std dev). | 8.5/10 |
+| **RM3** (Recovery time) | S2, S3, S2s, S3s | Choreography **signifikan lebih cepat** (S2: 22 vs 29 ms p=0.0002; S3: 13 vs 26 ms p<0.0001). Confounding call-all diisolasi dengan **MWU per pasangan**: S2 vs S2s tidak signifikan (p=0,50); S3 vs S3s signifikan (p=0,04, selisih 2 ms). | 8/10 |
 
 ### Verdict Objektif
 

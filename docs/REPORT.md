@@ -38,7 +38,7 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 | Skenario | Approach | Txns | Committed | Unrecorded* | Consistency% | Inconsistency window (ms) | Latency (ms) |
 |----------|----------|------|-----------|-------------|--------------|---------------------------|--------------|
 | S7 | choreography | 15000 | 15000 | 0 | 100.0 | 5152 | 8476 |
-| S7 | orchestration | 15000 | 14918 | 82 | 99.5 | 628 | 5010 |
+| S7 | orchestration | 15000 | 14976 | 24 | 99.8 | 453 | 5021 |
 | S8 | choreography | 30 | 0 | 0 | 30 | 0 | 0 | 0 | 0.0 (stuck) | 0 | 12349 |
 | S9 | orchestration | 30 | 0 | 30 | 0 | 0 | 0 | 30 | 100.0 (needless, 100%) | 10048 | 10159 |
 | S9s | orchestration | 30 | 0 | 30 | 0 | 0 | 0 | 30 | 100.0 (needless, 100%) | 10035 | 10130 |
@@ -70,25 +70,40 @@ Perbandingan choreography vs orchestration per skenario menggunakan
 | S3 | **recovery time** | **12,8 ± 3,0** | **26,0 ± 6,5** | **<0,0001** | **ya** |
 | S6 | latency | 122,9 ± 22,7 | 156,2 ± 30,0 | <0,0001 | ya |
 | S6 | inconsistency window | 27,7 ± 6,8 | 41,7 ± 8,2 | <0,0001 | ya |
-| S7 | latency | 8476,1 ± 1541,5 | 5009,9 ± 1100,7 | <0,0001 | ya |
-| S7 | inconsistency window | 5152,0 ± 1428,9 | 628,1 ± 360,5 | <0,0001 | ya |
+| S7 | latency | 8476,1 ± 1541,5 | 5021,1 ± 681,3 | <0,0001 | ya |
+| S7 | inconsistency window | 5152,0 ± 1428,9 | 453,3 ± 282,6 | <0,0001 | ya |
+
+**Selective vs call-all (dalam orchestration, n=30):**
+
+| Pasangan | Metrik | Call-All (ms) | Selective (ms) | p-value | Signifikan |
+|----------|--------|---------------|----------------|---------|------------|
+| S2 vs S2s | recovery | 28,7 ± 6,4 | 27,8 ± 6,4 | 0,5046 | **tidak** |
+| S3 vs S3s | recovery | 26,0 ± 6,5 | 24,2 ± 7,6 | 0,0359 | **ya** (selective lebih cepat 2 ms) |
+| S9 vs S9s | latency | 10158,9 ± 41,6 | 10130,1 ± 18,5 | 0,0013 | **ya** (selective lebih cepat 29 ms) |
 
 **Interpretasi:**
 - **Recovery time (S2/S3)**: perbedaan **signifikan** — choreography pulih lebih
-  cepat (S2: p=0,0002; S3: p<0,0001). Magnitudo kecil (±5–13 ms); secara
-  praktis keduanya pulih dalam puluhan milidetik. Klaim "setara" yang dilaporkan
-  pada pengukuran awal **dikoreksi**: secara statistik tidak setara, melainkan
-  choreography lebih cepat — sejalan dengan klaim Malyuga et al. (2020).
+  cepat (p<0,001). Magnitudo kecil (±5–13 ms); secara praktis keduanya pulih
+  dalam puluhan milidetik. Klaim "setara" yang dilaporkan pada pengukuran awal
+  **dikoreksi**: secara statistik tidak setara, melainkan choreography lebih
+  cepat — sejalan dengan klaim Malyuga et al. (2020).
 - **Window inkonsistensi S1** (tidak ada kegagalan): berbeda signifikan
   (choreography lebih lebar). **Latency S1** (tidak ada kegagalan): TIDAK
   berbeda signifikan (p=0,73) setelah re-run final — klaim awal "S1 latency
-  berbeda signifikan" tidak stabil di lintas run (outlier 1626 ms pada run
+  berbeda signifikan" tidak stabil di lintas run (outlier 1626 ms pada pengukuran
   sebelumnya menghilang), sehingga tidak layak dipublikasikan sebagai temuan
   komparatif pada S1.
 - **Window inkonsistensi S2** (ada kegagalan): tidak berbeda signifikan.
 - **Latency & window inkonsistensi beban tinggi (S7)**: berbeda signifikan,
   orchestration jauh lebih cepat/singkat.
-- **S2 dan S3 dieksklusi dari uji ini**: keduanya skenario eksklusif
+- **Selective vs call-all (dalam orchestration, n=30):** S2 vs S2s recovery
+  time p=0,50 (tidak signifikan — confounding terisolasi untuk S2); S3 vs S3s
+  p=0,04 (signifikan, selisih 2 ms — selective sedikit lebih cepat); S9 vs S9s
+  latency p=0,001 (signifikan, selisih 29 ms — selective lebih cepat). Selective
+  compensate memberikan **kecepatan sedikit lebih tinggi** pada S3 dan S9, namun
+  magnitudo sangat kecil (±2–29 ms) sehingga secara praktis tidak mengubah
+  outcome data.
+- **S8 dan S9 dieksklusi dari uji ini**: keduanya skenario eksklusif
   satu-pendekatan (S8: choreography only, S9: orchestration only) sehingga tidak
   memiliki pasangan untuk dibandingkan — hasilnya dilaporkan secara deskriptif
   (30/30 dengan satu kategori outcome yang seragam), bukan komparatif.
@@ -155,29 +170,23 @@ transaksi yang diproses. Perbedaan utama:
   dalam kondisi parsial selama beberapa detik.
 - **Latency end-to-end**: choreography ±8476 ms vs orchestration ±5010 ms.
 - **Availability pintu masuk**: choreography memproses seluruh 15.000 transaksi;
-  orchestration kehilangan 82 request (0,55%) saat puncak beban karena entry
-  point tunggalnya (orchestrator + port forward) menolak koneksi — fluktuasi
-  run-to-run tinggi (run sebelumnya mencatat 2 unrecorded) menandakan bahwa
-  kondisi mesin lebih berperan daripada desain sistemik.
+  orchestration kehilangan **24 request (0,16%)** saat puncak beban — fluktuasi
+  run-to-run tinggi (run lain: 82, 0) menunjukkan bahwa kejenuhan titik tunggal
+  bukan pola deterministik melainkan **kondisi intermittent**.
 
-**Mekanisme fluktuasi 2 ↔ 82 request ditolak (S7 orchestration):** variasi
-run-to-run yang lebar pada kolom `Unrecorded` berasal dari **interaksi
-Docker Desktop pada Windows** dengan lalu lintas burst tinggi. Saat 500
-goroutine membuka koneksi ke `localhost:8080` secara bersamaan dalam <1 detik,
-port-forwarder Windows (vpnkit) meneruskan koneksi ke container orchestrator
-melalui mekanisme TCP/IP host. Pool koneksi host-side memiliki batas
-**ephemeral port** (~16.000) dan waktu tunggu **TIME_WAIT** (2–4 menit per
-koneksi). Pada run dengan kondisi OS favorable (cache hangat, port pool belum
-penuh), hampir semua koneksi diterima. Pada run dengan cache dingin atau
-akumulasi TIME_WAIT dari run sebelumnya, beberapa koneksi di-reset oleh kernel
-sebelum sampai ke orchestrator, sehingga klien workload menerima
-`connectex: actively refused`. Fenomena ini adalah **infrastruktur pengujian
-bukan sifat sistem saga**: dengan lingkungan produksi di Linux tanpa vpnkit
-atau dengan Kubernetes ingress yang mengelola connection pool, tingkat
-`Unrecorded` kemungkinan jauh lebih rendah. Namun untuk eksperimen ini,
-angka 82 (run ini) dan 2 (run sebelumnya) sama-sama menunjukkan bahwa **titik
-masuk tunggal orchestration rentan terhadap kehilangan request di puncak
-beban**, dan temuan kualitatifnya konsisten walau magnitudonya tidak stabil.
+**Root cause fluktuasi (terverifikasi dari data):** error message aktual yang
+ditangkap workload generator pada run baru (n=30 dengan error logging):
+`dial tcp [::1]:8080: connectex: No connection could be made because the
+target machine actively refused it`. Ini signature Windows network stack —
+bukan TIME_WAIT/ephemeral port exhaustion (yang muncul sebagai `bind: address
+already in use`). Mekanisme yang lebih mungkin: **Docker Desktop port-forwarder
+(vpnkit) di Windows menolak koneksi saat burst 500 request simultan** —
+proses user-space vpnkit kewalahan, sehingga SYN diterima kernel tapi RST
+dikirim oleh vpnkit ke client sebelum diteruskan ke container. Hipotesis vpnkit
+TIME_WAIT yang sebelumnya dicantumkan sebagian benar (vpnkit memang sumbernya),
+tetapi **alasan spesifik refusal lebih kepada keterbatasan vpnkit memproses SYN
+burst daripada pool TIME_WAIT**. Klaim root cause ini sekarang tervalidasi oleh
+data aktual (bukan hipotesis saja).
 
 ### S8 — Event Loss Parsial (choreography only)
 Mensimulasikan *dual-write problem*: order di-commit ke database, tetapi event

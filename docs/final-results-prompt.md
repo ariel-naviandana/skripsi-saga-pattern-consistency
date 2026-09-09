@@ -96,12 +96,16 @@ berasal dari jalur eksekusi forward (hop Kafka), bukan pemulihan.
    efisiensi (±25 ms latency tambahan). Caveat call-all tetap valid untuk konteks
    S2/S3 (di mana call-all menambah jumlah HTTP call dan berpotensi mempengaruhi
    recovery time), tapi belum diisolasi secara empiris.
-5. **S2s & S3s (isolasi confounding RM3, n=30):** skenario step-failure (Shipping/Inventory
-   gagal) dengan SELECTIVE_COMPENSATE. Hasil: S2 (call-all) recovery 29 ms vs S2s
-   (selective) 28 ms; S3 (call-all) 26 ms vs S3s (selective) 24 ms. Selisih dalam
-   std dev → confounding call-all **terisolasi secara empiris** dengan n=30 (signifikan
-   dibanding n=10 sebelumnya yang punya outlier 296 ms di run 1). Selisih choreography
-   vs orchestration murni arsitektural, bukan artefak jumlah HTTP call.
+5. **S2s & S3s (isolasi confounding RM3, n=30 + MWU):** skenario step-failure
+   (Shipping/Inventory gagal) dengan SELECTIVE_COMPENSATE. Uji Mann-Whitney U
+   per pasangan (dalam orchestration): S2 vs S2s recovery **p=0,50**
+   (tidak signifikan — confounding terisolasi); S3 vs S3s **p=0,04** (signifikan,
+   selisih 2 ms, selective sedikit lebih cepat); S9 vs S9s latency **p=0,001**
+   (signifikan, selisih 29 ms). Selective compensate memberikan sedikit keuntungan
+   kecepatan pada S3/S9, namun magnitudo sangat kecil sehingga **tidak mengubah
+   outcome data** — keduanya tetap 100% compensated. Selisih choreography vs
+   orchestration murni arsitektural untuk S2, dan dominan arsitektural (bukan
+   dominan call-all) untuk S3.
 
 ## CAVEAT & KETERBATASAN YANG SUDAH DIDOKUMENTASIKAN
 

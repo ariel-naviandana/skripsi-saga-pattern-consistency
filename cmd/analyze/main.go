@@ -113,6 +113,21 @@ func sampleStd(v []float64) float64 {
 	return math.Sqrt(s / float64(len(v)-1))
 }
 
+// naIfZero returns "N/A" when count is 0, otherwise the formatted float.
+func naIfZero(count int, values ...float64) []string {
+	out := make([]string, len(values))
+	if count == 0 {
+		for i := range out {
+			out[i] = "N/A"
+		}
+		return out
+	}
+	for i, v := range values {
+		out[i] = fmt.Sprintf("%.0f", v)
+	}
+	return out
+}
+
 // normCDF is the standard normal cumulative distribution function.
 func normCDF(z float64) float64 {
 	return 0.5 * (1 + math.Erf(z/math.Sqrt2))
@@ -324,14 +339,16 @@ func main() {
 		return table[i].Approach < table[j].Approach
 	})
 
-fmt.Println("Scenario | Approach | Runs | Txns | Committed | Compensated | Inconsistent | NotFound | Unrecorded | Needless | Needless% | Consistency% | CompSuccess% | Rec# | AvgRec(ms) | MinRec | MaxRec | StdRec | Inc# | AvgInc(ms) | MinInc | MaxInc | StdInc | AvgLat(ms) | MinLat | MaxLat | StdLat")
+	fmt.Println("Scenario | Approach | Runs | Txns | Committed | Compensated | Inconsistent | NotFound | Unrecorded | Needless | Needless% | Consistency% | CompSuccess% | Rec# | AvgRec(ms) | MinRec | MaxRec | StdRec | Inc# | AvgInc(ms) | MinInc | MaxInc | StdInc | AvgLat(ms) | MinLat | MaxLat | StdLat")
 	fmt.Println("-------- | -------- | ---- | ---- | --------- | ----------- | ------------ | -------- | ---------- | -------- | --------- | ------------ | ------------ | ---- | ---------- | ------ | ------ | ------ | ---- | ---------- | ------ | ------ | ------ | ---------- | ------ | ------ | ------")
 	for _, a := range table {
-		fmt.Printf("%s | %s | %d | %d | %d | %d | %d | %d | %d | %d | %.0f | %.1f | %.1f | %d | %.0f | %.0f | %.0f | %.0f | %d | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f\n",
+		recVals := naIfZero(a.RecoveryCount, a.RecoveryAvgMS, a.RecoveryMinMS, a.RecoveryMaxMS, a.RecoveryStdMS)
+		incVals := naIfZero(a.InconsistencyCount, a.InconsistencyAvgMS, a.InconsistencyMinMS, a.InconsistencyMaxMS, a.InconsistencyStdMS)
+		fmt.Printf("%s | %s | %d | %d | %d | %d | %d | %d | %d | %d | %.0f | %.1f | %.1f | %d | %s | %s | %s | %s | %d | %s | %s | %s | %s | %.0f | %.0f | %.0f | %.0f\n",
 			a.Scenario, a.Approach, a.Runs, a.Transactions, a.Committed, a.Compensated,
-			a.Inconsistent, a.NotFound, a.Unrecorded, a.NeedlessCount, a.NeedlessRate, a.ConsistencyRate, a.CompSuccessRate, a.RecoveryCount,
-			a.RecoveryAvgMS, a.RecoveryMinMS, a.RecoveryMaxMS, a.RecoveryStdMS,
-			a.InconsistencyCount, a.InconsistencyAvgMS, a.InconsistencyMinMS, a.InconsistencyMaxMS, a.InconsistencyStdMS,
+			a.InconsistencyCount, a.NotFound, a.Unrecorded, a.NeedlessCount, a.NeedlessRate, a.ConsistencyRate, a.CompSuccessRate, a.RecoveryCount,
+			recVals[0], recVals[1], recVals[2], recVals[3],
+			a.InconsistencyCount, incVals[0], incVals[1], incVals[2], incVals[3],
 			a.LatencyAvgMS, a.LatencyMinMS, a.LatencyMaxMS, a.LatencyStdMS)
 	}
 
@@ -374,4 +391,49 @@ fmt.Println("Scenario | Approach | Runs | Txns | Committed | Compensated | Incon
 	sigOut, _ := json.MarshalIndent(sigs, "", "  ")
 	os.WriteFile(filepath.Join(*dir, "significance.json"), sigOut, 0o644)
 	fmt.Println("\nSignificance written to", filepath.Join(*dir, "significance.json"))
+
+	// Mann-Whitney U comparisons within orchestration: selective (S2s/S3s/S9s)
+	// vs call-all (S2/S3/S9). Tests whether call-all design measurably changes
+	// the metric (would falsify the confounding-isolated claim if significant).
+	var selSigs []sigResult
+	selectivePairs := []struct {
+		callAll, selective, label string
+		metric                   string
+	}{
+		{"S2", "S2s", "S2 vs S2s", "recovery_time"},
+		{"S3", "S3s", "S3 vs S3s", "recovery_time"},
+		{"S9", "S9s", "S9 vs S9s", "latency"},
+	}
+	for _, p := range selectivePairs {
+		x := perRun[p.callAll]["orchestration"][p.metric]
+		y := perRun[p.selective]["orchestration"][p.metric]
+		if len(x) < 8 || len(y) < 8 {
+			continue
+		}
+		u, pVal := mannWhitneyU(x, y)
+		selSigs = append(selSigs, sigResult{
+			Scenario:    p.label,
+			Metric:      p.metric,
+			ChoreoMean:  mean(x),
+			ChoreoStd:   sampleStd(x),
+			OrchMean:    mean(y),
+			OrchStd:     sampleStd(y),
+			U:           u,
+			PValue:      pVal,
+			Significant: pVal < 0.05,
+		})
+	}
+
+	fmt.Println("\nMann-Whitney U (selective vs call-all, within orchestration, alpha=0.05)")
+	fmt.Println("Pair | Metric | CallAll mean | CallAll std | Selective mean | Selective std | U | p-value | Significant")
+	fmt.Println("----- | ------ | ------------ | ----------- | -------------- | -------------- | ------ | ------- | -----------")
+	for _, s := range selSigs {
+		fmt.Printf("%s | %s | %.1f | %.1f | %.1f | %.1f | %.1f | %.4f | %v\n",
+			s.Scenario, s.Metric, s.ChoreoMean, s.ChoreoStd, s.OrchMean, s.OrchStd, s.U, s.PValue, s.Significant)
+	}
+
+	// Append selective results to significance.json.
+	combined, _ := json.MarshalIndent(append(sigs, selSigs...), "", "  ")
+	os.WriteFile(filepath.Join(*dir, "significance.json"), combined, 0o644)
+	fmt.Println("\nSignificance (choreo-vs-orch + selective-vs-call-all) written to", filepath.Join(*dir, "significance.json"))
 }
