@@ -407,6 +407,35 @@ pada response loss).
   kelalaian implementasi.
 - Nilai latency S6 (±129–188 ms) mencerminkan waktu konfirmasi inkonsistensi,
   bukan waktu pemulihan (tidak ada pemulihan pada S6).
+- **Non-atomicity write bisnis + saga_log (B1).** Delapan fungsi bisnis
+  (`CreateOrder`, `ProcessPayment`, `ReserveInventory`, `ScheduleShipping` +
+  4 compensate) membungkus INSERT/UPDATE ke tabel bisnis dan INSERT ke
+  `saga_log` sebagai **dua statement terpisah yang masing-masing auto-commit**
+  (tidak dalam satu database transaction). Gap window antara keduanya sangat
+  kecil (~mikrodetik), dan spot-check terhadap 500 transaksi S7 (data terakhir
+  yang masih ada di DB sebelum reset) tidak menemukan orfan — namun ini
+  verifikasi terhadap 1 run, bukan seluruh 300+ run historis (karena
+  `reset.sh` menghapus data mentah antar iterasi).
+- **Partial idempotency compensate (B2).** Compensate functions memiliki
+  status guard (`WHERE status = 'committed'`) sehingga UPDATE aman dipanggil
+  berkali-kali. Namun `writeLog()` menulis duplikat ke `saga_log` tanpa
+  `ON CONFLICT` — pemanggilan kedua akan menghasilkan baris saga_log
+  duplikat. Ini tidak memengaruhi metrik agregat karena analyze tool baca
+  dari JSON (bukan query DB), dan workload-generator pakai per-saga queries
+  (bukan COUNT/GROUP BY).
+- **Inventory Service tanpa validasi stok (B3).** Proposal section 3.2.1
+  menyebutkan Inventory Service "mengurangi stok", namun implementasi hanya
+  mencatat reservasi (append-only log) tanpa kolom `stock` atau validasi
+  ketersediaan. Kegagalan pada S3 disimulasikan murni melalui fault
+  injection (`FAIL_AT_STEP=inventory`), bukan melalui kondisi bisnis nyata
+  seperti stok habis.
+- **Connection pool S7 belum diverifikasi (C3).** Semua service menggunakan
+  `MaxConns=4` (pgx default). Pola pemakaian koneksi antara choreography
+  (event-driven, lepas-pakai per event) dan orchestration (HTTP sekuensial
+  per saga) berbeda secara struktural, sehingga dampak MaxConns=4 bisa saja
+  tidak sama rata ke kedua pendekatan — ini **asumsi yang belum diverifikasi
+  secara empiris** dan merupakan potensi confounding factor tambahan yang
+  belum diisolasi.
 
 ## Rekomendasi Langkah Selanjutnya
 

@@ -200,7 +200,11 @@ Kalau crash terjadi tepat di antara kedua statement, tabel bisnis ter-update tap
 **Implikasi terhadap data yang sudah ada**:
 - Kecil kemungkinannya terjadi secara natural (window antara dua INSERT sangat kecil, ~mikrodetik)
 - Fault injection (S2-S9) menyebabkan kegagalan di level HTTP/Kafka, bukan di level DB transaction
-- Gap window ini bukan penyebab hasil yang teramati dalam eksperimen
+- **Spot-check empiris** (500 transaksi S7 dari data terakhir yang masih ada di DB sebelum
+  reset): 8 query orphan (2 per service × 4 service) return **0 baris** — tidak ada
+  `saga_id` yang punya entry di tabel bisnis tanpa entry di saga_log, atau sebaliknya.
+  Namun ini verifikasi terhadap **1 run**, bukan seluruh 300+ run historis (karena
+  `reset.sh` menghapus data mentah antar iterasi).
 
 **Rekomendasi**: Untuk tahap proposal, cukup **dicatat sebagai keterbatasan metodologis** di REPORT.md. Tidak perlu run ulang. Untuk versi production, harus diperbaiki:
 
@@ -291,7 +295,11 @@ CREATE TABLE IF NOT EXISTS saga_log (
 
 **Implikasi terhadap data yang sudah ada**:
 - Dalam eksperimen ini, compensate hanya dipanggil 1x per saga (tidak ada retry loop)
-- Duplikat saga_log tidak memengaruhi klasifikasi outcome (checker pakai status terakhir dari `Timeline()`)
+- Duplikat saga_log tidak memengaruhi **klasifikasi outcome** (checker pakai status terakhir dari `Timeline()`)
+- Duplikat saga_log juga tidak memengaruhi **metrik agregat**: analyze tool (`cmd/analyze/main.go`)
+  tidak punya SQL query — baca murni dari JSON files. Workload-generator pakai per-saga queries
+  (`WHERE saga_id = $1`), bukan `COUNT(*)` atau `GROUP BY`. Recovery time = timestamp difference
+  (min/max), bukan row count. Duplikat tidak menggeser min/max timestamp.
 - Tapi ini tetap **cacat desain** yang perlu dicatat
 
 **Rekomendasi**: Untuk tahap proposal, cukup **dicatat sebagai keterbatasan**. Untuk perbaikan:
@@ -507,7 +515,15 @@ func NewPool(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
 - 496 request akan mengantre menunggu koneksi
 - Menambah latency yang **bukan** dari karakteristik arsitektural
 
-**Perbandingan choreography vs orchestration masih valid**: Kedua pendekatan pakai pool size yang sama (4), sehingga bottleneck ini terdampak sama rata. Perbedaan yang diamati di S7 (choreography lebih lambat) murni dari arsitektural (Kafka serialization), bukan dari pool size.
+**Perbandingan choreography vs orchestration: asumsi yang belum diverifikasi secara empiris.**
+
+Klaim "kedua pendekatan terdampak sama rata" adalah **asumsi, bukan bukti**. Pola pemakaian
+koneksi antara choreography (event-driven, lepas-pakai per event, parallel per partition) dan
+orchestration (HTTP sekuensial per saga, nahan koneksi lebih lama) berbeda secara struktural.
+Dampak MaxConns=4 bisa saja tidak sama rata — ini potensi confounding factor tambahan yang
+belum diisolasi, mirip dengan kasus call-all vs selective yang sebelumnya ditemukan. Mengklarifikasi
+ini perlu monitoring koneksi DB per service selama S7 berjalan — tidak wajib untuk tahap
+proposal, tapi perlu dicatat sebagai asumsi yang belum diverifikasi.
 
 **Rekomendasi**: Catatan di REPORT.md bahwa S7 latency terpengaruh oleh pool size default (MaxConns=4). Untuk production, pool harus dinaikkan. Untuk perbandingan antar-pendekatan, pool size bukan confounding factor.
 
@@ -519,12 +535,12 @@ func NewPool(ctx context.Context, cfg Config) (*pgxpool.Pool, error) {
 |------|--------|-----------|----------|
 | A1 quiescence S7 | ✅ Cukup (10s window, 7s max inter-step) | – | Tidak perlu ubah |
 | A2 DELAY_MS scoping | ✅ Aman (statis, 3 layer safety net) | – | Catat metodologi |
-| **B1 atomicity bisnis+saga_log** | ⚠️ **TIDAK ATOMIC** | **Tinggi** | **Catat sebagai keterbatasan** |
-| **B2 idempotency compensate** | ⚠️ **Partial** (UPDATE aman, saga_log duplikat) | **Tinggi** | **Catat sebagai keterbatasan** |
+| **B1 atomicity bisnis+saga_log** | ⚠️ **TIDAK ATOMIC** + spot-check 0 orphan | **Tinggi** | **Catat sebagai keterbatasan** |
+| **B2 idempotency compensate** | ⚠️ **Partial** (UPDATE aman, saga_log duplikat, metrik agregat aman) | **Tinggi** | **Catat sebagai keterbatasan** |
 | B3 concurrency inventory | ✅ Tidak ada risk (tidak ada kolom stock) | – | Tidak perlu ubah |
 | C1 reset flags | ✅ Lengkap (runtime accumulators di-reset) | – | Tidak perlu ubah |
 | C2 timestamp | ✅ Konsisten (semua pakai DB now()) | – | Tidak perlu ubah |
-| **C3 pool size S7** | ⚠️ **Default MaxConns=4** | **Sedang** | **Catat sebagai keterbatasan** |
+| **C3 pool size S7** | ⚠️ **Default MaxConns=4, asumsi "sama rata" belum diverifikasi** | **Sedang** | **Catat sebagai keterbatasan** |
 | B4 unit test | ❌ Tidak ada (0 test files) | Rendah | Nice-to-have |
 
 ### Temuan yang perlu didokumentasikan di REPORT.md
