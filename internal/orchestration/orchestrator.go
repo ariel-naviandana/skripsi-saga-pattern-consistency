@@ -58,6 +58,7 @@ func (o *Orchestrator) SetDBs(order, payment, inventory, shipping *pgxpool.Pool)
 // for backwards-compatible behavior when SELECTIVE_COMPENSATE is off).
 func (o *Orchestrator) stepCommitted(ctx context.Context, pool *pgxpool.Pool, table, sagaID string) bool {
 	if pool == nil {
+		log.Printf("orchestrator: stepCommitted(%s) pool nil — defaulting to compensate", table)
 		return true
 	}
 	var status string
@@ -67,6 +68,7 @@ func (o *Orchestrator) stepCommitted(ctx context.Context, pool *pgxpool.Pool, ta
 		return false
 	}
 	if err != nil {
+		log.Printf("orchestrator: stepCommitted(%s, %s) db error (fallback to compensate): %v", table, sagaID, err)
 		return true
 	}
 	return status == "committed"

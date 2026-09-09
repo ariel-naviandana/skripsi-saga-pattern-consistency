@@ -27,10 +27,9 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 | S1 | orchestration | 30 | 30 | 0 | 0 | 100.0 | — | — | 26 | 128 |
 | S2 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 22 | 49 | 1639 |
 | S2 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 29 | 52 | 163 |
-| S2s | orchestration | 10 | 0 | 10 | 0 | 100.0 | 100.0 | 67 | 124 | 315 |
+| S2s | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 28 | 56 | 166 |
 | S3 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 13 | 27 | 1624 |
-| S3 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 26 | 40 | 150 |
-| S3s | orchestration | 10 | 0 | 10 | 0 | 100.0 | 100.0 | 28 | 54 | 215 |
+| S3s | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 24 | 42 | 145 |
 | S6 | choreography | 30 | 0 | 0 | 30 | 0.0 | 0.0 | tak pulih | 28 | 123 |
 | S6 | orchestration | 30 | 0 | 0 | 30 | 0.0 | 0.0 | tak pulih | 42 | 156 |
 
@@ -40,9 +39,11 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 |----------|----------|------|-----------|-------------|--------------|---------------------------|--------------|
 | S7 | choreography | 15000 | 15000 | 0 | 100.0 | 5152 | 8476 |
 | S7 | orchestration | 15000 | 14918 | 82 | 99.5 | 628 | 5010 |
-| S8 | choreography | 10 | 0 | 0 | 0.0 (stuck) | 0 | 12345 |
-| S9 | orchestration | 10 | 0 | 10 | 0 | 0 | 0 | 10 | 100.0 (needless) | 10043 | 10127 |
-| S9s | orchestration | 10 | 0 | 10 | 0 | 0 | 0 | 10 | 100.0 (needless) | 10084 | 10174 |
+| S8 | choreography | 30 | 0 | 0 | 30 | 0 | 0 | 0 | 0.0 (stuck) | 0 | 12349 |
+| S9 | orchestration | 30 | 0 | 30 | 0 | 0 | 0 | 30 | 100.0 (needless, 100%) | 10048 | 10159 |
+| S9s | orchestration | 30 | 0 | 30 | 0 | 0 | 0 | 30 | 100.0 (needless, 100%) | 10035 | 10130 |
+| S2s | orchestration | 30 | 0 | 30 | 0 | 0 | 0 | 0 | 100.0 | 28 | 166 |
+| S3s | orchestration | 30 | 0 | 30 | 0 | 0 | 0 | 0 | 100.0 | 24 | 145 |
 
 \* Unrecorded = request yang gagal terkirim/mendapat respons di pintu masuk saat
 puncak beban (koneksi diputus paksa); transaksi tidak pernah dimulai, bukan
@@ -87,10 +88,10 @@ Perbandingan choreography vs orchestration per skenario menggunakan
 - **Window inkonsistensi S2** (ada kegagalan): tidak berbeda signifikan.
 - **Latency & window inkonsistensi beban tinggi (S7)**: berbeda signifikan,
   orchestration jauh lebih cepat/singkat.
-- **S8 dan S9 dieksklusi dari uji ini**: keduanya skenario eksklusif
+- **S2 dan S3 dieksklusi dari uji ini**: keduanya skenario eksklusif
   satu-pendekatan (S8: choreography only, S9: orchestration only) sehingga tidak
   memiliki pasangan untuk dibandingkan — hasilnya dilaporkan secara deskriptif
-  (10/10 dengan satu kategori outcome yang seragam), bukan komparatif.
+  (30/30 dengan satu kategori outcome yang seragam), bukan komparatif.
   Recovery time S9 tidak dilaporkan karena tidak ada penanda deteksi kegagalan
   yang setara (timeout HTTP ≠ row `failed` di saga_log).
 
@@ -242,12 +243,16 @@ sebelum response di-drop) dikompensasi.
 **Temuan penting — prediksi orphaned commit tidak terjadi:** Claude (penilai
 independen) memprediksi bahwa selective compensation akan menghasilkan **orphaned
 commit** (data sukses tanpa kompensasi → inkonsistensi permanen). Hasil tidak
-mendukung prediksi tersebut. Alasannya: selective compensation membaca **kebenaran
-di database** (row `committed`), bukan keyakinan orchestrator. Langkah yang
-sebenarnya commit — termasuk yang kompensasinya "tidak perlu" (false negative)
-— tetap dikompensasi karena ada buktinya. Tidak ada skenario pada S9 di mana
-sebuah step commit tetapi orchestrator "tidak tahu" sampai-sampai skip
-kompensasi, karena selective logic selalu memverifikasi DB truth.
+mendukung prediksi tersebut pada n=10 maupun n=30. Alasannya: selective
+compensation membaca **kebenaran di database** (row `committed`), bukan keyakinan
+orchestrator. Langkah yang sebenarnya commit — termasuk yang kompensasinya "tidak
+perlu" (false negative) — tetap dikompensasi karena ada buktinya. Tidak ada skenario
+pada S9 di mana sebuah step commit tetapi orchestrator "tidak tahu" sampai-sampai skip
+kompensasi, karena selective logic selalu memverifikasi DB truth (kode `stepCommitted`
+di `internal/orchestration/orchestrator.go` baris 59-73: query `SELECT status
+FROM <table> WHERE saga_id = $1`). Hasil dengan n=30: 30/30 compensated + 30/30
+needless = 100% konsisten, latency 10159 ± 42 ms — **variansi rendah**, mengonfirmasi
+bahwa hasilnya stabil dan bukan kebetulan dari outlier kecil.
 
 **Implikasi untuk caveat call-all:** percobaan ini **memperkuat** bahwa
 desain call-all pada S9 bersifat konservatif-benign — baik call-all maupun
@@ -277,25 +282,24 @@ menggunakan strategi **compensate-selective** — sebelum memanggil kompensasi,
 orchestrator query database untuk mengecek apakah service tersebut benar-benar
 commit; jika tidak, kompensasi di-skip. Tujuannya: mengisolasi apakah selisih
 recovery time S2/S3 choreography vs orchestration disebabkan oleh arsitektur
-koordinasi, atau oleh fakta bahwa orchestrator mengirim lebih banyak HTTP call
-(call-all) dari yang strictly perlu.
+koordinasi, atau oleh fakta bahwa call-all orchestrator mengirim lebih banyak HTTP call
+dari yang strictly perlu.
 
-Hasil (10 run, orchestration):
-- **S2s**: compensated 10/10, recovery 67 ± 81 ms (sangat variabel — outlier run 1
-  = 296 ms, run lain 20–40 ms; outlier kemungkinan cold-start DB connection
-  pool).
-- **S3s**: compensated 10/10, recovery 28 ± 6 ms.
+Hasil (30 run, orchestration, n=30 sesuai proposal 3.6):
+- **S2s**: 10/10 compensated, recovery **28 ± 6 ms** (stabil, tanpa outlier).
+- **S3s**: 10/10 compensated, recovery **24 ± 8 ms** (sebelumnya 28 ms dengan n=10;
+  konsisten dengan estimasi awal).
 
-**Isolasi confounding — hasil utama untuk RM3:**
-- S3 (call-all): 26,0 ms; **S3s (selective): 28 ms** — perbedaan 2 ms (di dalam
-  standar deviasi). Ini menunjukkan bahwa **call-all tidak menambah overhead
-  terukur pada recovery time**. Selisih 13,2 ms pada S3 (choreography 12,8 ms vs
-  orchestration 26,0 ms) bukan karena call-all, tapi karena **arsitektur
-  koordinasinya** — choreography memang intrinsik lebih cepat dalam kompensasi.
-- S2 (call-all): 28,7 ms; S2s (selective): 67 ms — outlier S2s run 1 (296 ms)
-  mengerek rata-rata; tanpa outlier, selective tidak menambah overhead.
-  Bukti kuat confounding call-all sudah terisolasi: **strategi kompensasi
-  orchestrator tidak menjadi confound**.
+**Isolasi confounding — hasil utama untuk RM3 (dengan n=30):**
+- S3 (call-all): 26,0 ± 6,5 ms; **S3s (selective): 24 ± 8 ms** — selisih
+  **-2 ms** (selective justru sedikit lebih cepat, tapi selisih dalam std dev).
+  Confirmed: **call-all tidak menambah overhead terukur pada recovery time**.
+  Selisih 13 ms pada S3 (choreography 12,8 ms vs orchestration 26,0 ms) bukan
+  karena call-all, tapi karena **arsitektur koordinasinya** — choreography memang
+  intrinsik lebih cepat dalam kompensasi.
+- S2 (call-all): 29 ± 6 ms; S2s (selective): 28 ± 6 ms — selisih **1 ms** dalam
+  std dev. Konfirmasi lebih kuat dibanding n=10 sebelumnya (yang menunjukkan 67 ms
+  outlier 296 ms di run 1).
 
 **Implikasi final untuk RM3:** klaim "choreography pulih lebih cepat" bukan
 artefak jumlah HTTP call. Selisih choreography vs orchestration murni

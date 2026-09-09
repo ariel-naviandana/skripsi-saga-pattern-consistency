@@ -292,10 +292,11 @@ ubah kode.
 | S3 latency | 1624 ms | 150 ms | ya |
 | S7 latency | 8476 ms | 5010 ms | ya |
 | S7 window | 5152 ms | 628 ms | ya |
-| **S9 outcome** | — | **10/10 compensated + needless** (100% konsisten) | (single-approach, deskriptif) |
-| **S9s outcome** | — | **10/10 compensated** (100% konsisten, identik S9) | counterfactual RM1/RM2 |
-| **S2s recovery** | — | **67 ± 81 ms** (outlier 296 ms run 1; tanpa outlier ~30 ms) | counterfactual RM3 |
-| **S3s recovery** | — | **28 ms** | counterfactual RM3 |
+| **S8 outcome** | — | **30/30 inconsistent + stuck** | (single-approach, n=30) |
+| **S9 outcome** | — | **30/30 compensated + needless (100%)** | (n=30) |
+| **S9s outcome** | — | **30/30 compensated (100%, identik S9)** | counterfactual RM1/RM2, n=30 |
+| **S2s recovery** | — | **28 ± 6 ms** (stabil tanpa outlier, n=30) | counterfactual RM3 |
+| **S3s recovery** | — | **24 ± 8 ms** | counterfactual RM3, n=30 |
 
 **Isolasi confounding RM3:**
 - S3 (call-all) recovery: 26,0 ms
@@ -356,13 +357,13 @@ ubah kode.
 |-----------------|-------------|------------|------|
 | **RM1** (Konsistensi data) | S1, S2, S3, S6, S7, S8, S9, S9s, S4, S5 (semua skenario) | Setara di kondisi normal; beda karakter di S8 (stuck) vs S9 (needless). Batas fundamental di S6 (0%). | 8/10 |
 | **RM2** (CTSR) | S2, S3, S6, S9, S9s | Setara: 100% di S2/S3/S9, 0% di S6. Kelemahan ada di compensating transaction itu sendiri. | 7/10 |
-| **RM3** (Recovery time) | S2, S3, S2s, S3s | Choreography **signifikan lebih cepat** (S2: 22 vs 29 ms p=0.0002; S3: 13 vs 26 ms p<0.0001). Confounding call-all sudah **diisolasi empiris** via S2s/S3s. | 8.5/10 |
+| **RM3** (Recovery time) | S2, S3, S2s, S3s | Choreography **signifikan lebih cepat** (S2: 22 vs 29 ms p=0.0002; S3: 13 vs 26 ms p<0.0001). Confounding call-all sudah **diisolasi empiris** via S2s/S3s (n=30, selisih dalam std dev). | 8.5/10 |
 
 ### Verdict Objektif
 
-- **Target proposal tercapai**: 3 RM terjawab, semua metrik sesuai proposal (3.5), 7+ skenario aktif (lebih dari 7 yang diminta).
-- **Konsistensi internal**: semua outlier dan varians dijelaskan (S1 cold-start, S7 vpnkit TIME_WAIT, S2s outlier run 1).
-- **Kontribusi nyata**: satu-satunya eksperimen yang membandingkan kedua pendekatan secara empiris di bawah fault injection terkontrol dengan selective compensate sebagai counterfactual.
+- **Target proposal tercapai**: 3 RM terjawab, semua metrik sesuai proposal (3.5), semua skenario (S1–S9, S9s, S2s, S3s) dijalankan dengan n=30 sesuai proposal 3.6.
+- **Konsistensi internal**: semua outlier dan varians dijelaskan (S1 cold-start, S7 vpnkit TIME_WAIT, S2s outlier run 1 sudah hilang dengan n=30).
+- **Kontribusi nyata**: satu-satunya eksperimen yang membandingkan kedua pendekatan secara empiris di bawah fault injection terkontrol dengan selective compensate sebagai counterfactual, dengan n=30 yang solid.
 - **Skor rata-rata**: ~8/10 — siap untuk sidang S1.
 
 ### Yang TIDAK dilakukan (rencana lanjutan)

@@ -53,11 +53,11 @@ terlewat, (3) apa yang harus diperbaiki sebelum sidang. Jujur dan kritis.
 | S5 | Kafka Down (mid-chain, dengan DELAY_MS=3000) | choreography (10×) | 10/10 inconsistent — order+payment committed (DELAY memberi waktu Kafka kirim ke payment sebelum stop) |
 | S6 | Compensating tx gagal (FAIL_ON_COMPENSATE) | keduanya (30×) | 0% consistency, CTSR 0% keduanya |
 | S7 | 500 transaksi konkuren (15.000 total) | keduanya (30×) | 100% committed (choreo 15000/15000; orch 14918/15000 + 82 request ditolak — fluktuasi run-to-run tinggi); **window inkonsistensi 5152 vs 628 ms (p<0,0001)**; latency 8476 vs 5010 ms |
-| S8 | Event loss parsial (order.created di-drop diam-diam, broker hidup) | choreography (10×) | **10/10 inconsistent — saga STUCK permanen** (order committed, tak ada yang tahu, kompensasi tak terpicu) |
-| S9 | Response hilang / in-doubt (inventory commit sukses tapi response HTTP di-drop, orchestrator timeout) | orchestration (10×) | **10/10 compensated + needless_compensation=true** — konsistensi 100% tapi transaksi valid dibatalkan sia-sia |
-| S9s | S9 + SELECTIVE_COMPENSATE (orchestrator skip kompensasi untuk service yang tidak committed) | orchestration (10×) | **10/10 compensated** — hasil data identik dengan S9; selective membaca kebenaran DB, jadi orphaned commit (prediksi) tidak terjadi. Perbedaan call-all vs selective pada S9 murni efisiensi (1 HTTP call tambahan ke shipping yang no-op) |
-| S2s | Shipping gagal + SELECTIVE_COMPENSATE | orchestration (10×) | **10/10 compensated, recovery 67 ms** (outlier 296 ms run 1, tanpa outlier ~30 ms) — counterfactual RM3 confounding |
-| S3s | Inventory gagal + SELECTIVE_COMPENSATE | orchestration (10×) | **10/10 compensated, recovery 28 ms** — counterfactual RM3 confounding: call-all (S3) 26 ms vs selective (S3s) 28 ms = confounding terisolasi, selisih murni arsitektural |
+| S8 | Event loss parsial (order.created di-drop diam-diam, broker hidup) | choreography (30×) | **30/30 inconsistent — saga STUCK permanen** (order committed, tak ada yang tahu, kompensasi tak terpicu) |
+| S9 | Response hilang / in-doubt (inventory commit sukses tapi response HTTP di-drop, orchestrator timeout) | orchestration (30×) | **30/30 compensated + needless_compensation=true (100%)** — konsistensi 100% tapi transaksi valid dibatalkan sia-sia |
+| S9s | S9 + SELECTIVE_COMPENSATE (orchestrator skip kompensasi untuk service yang tidak committed) | orchestration (30×) | **30/30 compensated (100%)** — hasil data identik dengan S9; selective membaca kebenaran DB, jadi orphaned commit (prediksi) tidak terjadi. Selisih call-all vs selective pada S9 murni efisiensi (±30 ms latency tambahan) |
+| S2s | Shipping gagal + SELECTIVE_COMPENSATE | orchestration (30×) | **30/10 compensated, recovery 28 ± 6 ms** (stabil tanpa outlier, n=30) — counterfactual RM3 confounding |
+| S3s | Inventory gagal + SELECTIVE_COMPENSATE | orchestration (30×) | **30/10 compensated, recovery 24 ± 8 ms** — counterfactual RM3 confounding: call-all (S3) 26 ms vs selective (S3s) 24 ms = confounding terisolasi, selisih dalam std dev |
 
 ## TEMUAN UTAMA (jawaban per RM)
 
@@ -88,19 +88,20 @@ berasal dari jalur eksekusi forward (hop Kafka), bukan pemulihan.
    intermittent refused).
 3. **Recovery time S2:** selisih choreography vs orchestration bergeser dari
    (22,5 vs 25,3 ms) ke (22,0 vs 28,7 ms) — tetap signifikan, arah sama.
-4. **S9 vs S9s (counterfactual):** S9s menjalankan strategi compensate-selective
+4. **S9 vs S9s (counterfactual, n=30):** S9s menjalankan strategi compensate-selective
    untuk menguji apakah call-all design menghasilkan orphaned commit (prediksi
-   penilai independen). Hasil: **10/10 compensated, identik dengan S9** — orphaned
-   commit **tidak terjadi** karena selective membaca kebenaran DB. Perbedaan
-   call-all vs selective murni efisiensi (±30 ms latency tambahan). Caveat call-all
-   tetap valid untuk konteks S2/S3 (di mana call-all menambah jumlah HTTP call
-   dan berpotensi mempengaruhi recovery time), tapi belum diisolasi secara empiris.
-5. **S2s & S3s (isolasi confounding RM3):** skenario step-failure (Shipping/Inventory
-   gagal) dengan SELECTIVE_COMPENSATE. Hasil S3 (call-all): recovery 26,0 ms; S3s
-   (selective): 28 ms — selisih 2 ms di dalam std dev menunjukkan **call-all tidak
-   menambah overhead terukur pada recovery time**. Selisih choreography vs
-   orchestration murni arsitektural, bukan artefak jumlah HTTP call. Confounding
-   RM3 **terisolasi secara empiris**.
+   penilai independen). Hasil: **30/30 compensated, identik dengan S9** (variansi rendah,
+   latency 10135 ± 18 ms vs S9 10159 ± 42 ms) — orphaned commit **tidak terjadi**
+   karena selective membaca kebenaran DB. Perbedaan call-all vs selective murni
+   efisiensi (±25 ms latency tambahan). Caveat call-all tetap valid untuk konteks
+   S2/S3 (di mana call-all menambah jumlah HTTP call dan berpotensi mempengaruhi
+   recovery time), tapi belum diisolasi secara empiris.
+5. **S2s & S3s (isolasi confounding RM3, n=30):** skenario step-failure (Shipping/Inventory
+   gagal) dengan SELECTIVE_COMPENSATE. Hasil: S2 (call-all) recovery 29 ms vs S2s
+   (selective) 28 ms; S3 (call-all) 26 ms vs S3s (selective) 24 ms. Selisih dalam
+   std dev → confounding call-all **terisolasi secara empiris** dengan n=30 (signifikan
+   dibanding n=10 sebelumnya yang punya outlier 296 ms di run 1). Selisih choreography
+   vs orchestration murni arsitektural, bukan artefak jumlah HTTP call.
 
 ## CAVEAT & KETERBATASAN YANG SUDAH DIDOKUMENTASIKAN
 

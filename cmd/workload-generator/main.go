@@ -23,6 +23,7 @@ type result struct {
 	RecoveryTimeMS  *int64                   `json:"recovery_time_ms,omitempty"`
 	InconsistencyMS *int64                   `json:"inconsistency_ms,omitempty"`
 	Needless        bool                     `json:"needless_compensation,omitempty"`
+	ErrorMsg        string                   `json:"error,omitempty"`
 }
 
 type summary struct {
@@ -136,7 +137,11 @@ func main() {
 			reqStart := time.Now()
 			resp, err := http.Post(baseURL, "application/json", bytes.NewReader(body))
 			if err != nil {
+				errMsg := err.Error()
 				log.Printf("workload: request %d failed: %v", i, err)
+				mu.Lock()
+				results = append(results, result{SagaID: "", Outcome: "not_found", LatencyMS: time.Since(reqStart).Milliseconds(), ErrorMsg: errMsg})
+				mu.Unlock()
 				return
 			}
 			var sagaID string

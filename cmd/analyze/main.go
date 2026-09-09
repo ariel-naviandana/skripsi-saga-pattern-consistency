@@ -46,12 +46,13 @@ type agg struct {
 	RecoveryMinMS     float64 `json:"min_recovery_time_ms"`
 	RecoveryMaxMS     float64 `json:"max_recovery_time_ms"`
 	RecoveryStdMS     float64 `json:"std_recovery_time_ms"`
+	NeedlessCount      int     `json:"needless_compensation_count"`
+	NeedlessRate       float64 `json:"needless_compensation_rate_pct"`
 	InconsistencyCount int    `json:"inconsistency_count"`
 	InconsistencyAvgMS float64 `json:"avg_inconsistency_ms"`
 	InconsistencyMinMS float64 `json:"min_inconsistency_ms"`
 	InconsistencyMaxMS float64 `json:"max_inconsistency_ms"`
 	InconsistencyStdMS float64 `json:"std_inconsistency_ms"`
-	NeedlessCount      int     `json:"needless_compensation_count"`
 	LatencyAvgMS      float64 `json:"avg_latency_ms"`
 	LatencyMinMS      float64 `json:"min_latency_ms"`
 	LatencyMaxMS      float64 `json:"max_latency_ms"`
@@ -296,12 +297,18 @@ func main() {
 				RecoveryMinMS:   recMin,
 				RecoveryMaxMS:   recMax,
 				RecoveryStdMS:   sampleStd(recoveries),
+				NeedlessCount:   needlessCount,
+				NeedlessRate:    func() float64 {
+					if total.Compensated == 0 {
+						return 0
+					}
+					return float64(needlessCount) / float64(total.Compensated) * 100
+				}(),
 				InconsistencyCount: len(inconsistencies),
 				InconsistencyAvgMS: mean(inconsistencies),
 				InconsistencyMinMS: incMin,
 				InconsistencyMaxMS: incMax,
 				InconsistencyStdMS: sampleStd(inconsistencies),
-				NeedlessCount:     needlessCount,
 				LatencyAvgMS:    mean(latencies),
 				LatencyMinMS:    latMin,
 				LatencyMaxMS:    latMax,
@@ -317,12 +324,12 @@ func main() {
 		return table[i].Approach < table[j].Approach
 	})
 
-	fmt.Println("Scenario | Approach | Runs | Txns | Committed | Compensated | Inconsistent | NotFound | Unrecorded | Needless | Consistency% | CompSuccess% | Rec# | AvgRec(ms) | MinRec | MaxRec | StdRec | Inc# | AvgInc(ms) | MinInc | MaxInc | StdInc | AvgLat(ms) | MinLat | MaxLat | StdLat")
-	fmt.Println("-------- | -------- | ---- | ---- | --------- | ----------- | ------------ | -------- | ---------- | -------- | ------------ | ------------ | ---- | ---------- | ------ | ------ | ------ | ---- | ---------- | ------ | ------ | ------ | ---------- | ------ | ------ | ------")
+fmt.Println("Scenario | Approach | Runs | Txns | Committed | Compensated | Inconsistent | NotFound | Unrecorded | Needless | Needless% | Consistency% | CompSuccess% | Rec# | AvgRec(ms) | MinRec | MaxRec | StdRec | Inc# | AvgInc(ms) | MinInc | MaxInc | StdInc | AvgLat(ms) | MinLat | MaxLat | StdLat")
+	fmt.Println("-------- | -------- | ---- | ---- | --------- | ----------- | ------------ | -------- | ---------- | -------- | --------- | ------------ | ------------ | ---- | ---------- | ------ | ------ | ------ | ---- | ---------- | ------ | ------ | ------ | ---------- | ------ | ------ | ------")
 	for _, a := range table {
-		fmt.Printf("%s | %s | %d | %d | %d | %d | %d | %d | %d | %d | %.1f | %.1f | %d | %.0f | %.0f | %.0f | %.0f | %d | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f\n",
+		fmt.Printf("%s | %s | %d | %d | %d | %d | %d | %d | %d | %d | %.0f | %.1f | %.1f | %d | %.0f | %.0f | %.0f | %.0f | %d | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f | %.0f\n",
 			a.Scenario, a.Approach, a.Runs, a.Transactions, a.Committed, a.Compensated,
-			a.Inconsistent, a.NotFound, a.Unrecorded, a.NeedlessCount, a.ConsistencyRate, a.CompSuccessRate, a.RecoveryCount,
+			a.Inconsistent, a.NotFound, a.Unrecorded, a.NeedlessCount, a.NeedlessRate, a.ConsistencyRate, a.CompSuccessRate, a.RecoveryCount,
 			a.RecoveryAvgMS, a.RecoveryMinMS, a.RecoveryMaxMS, a.RecoveryStdMS,
 			a.InconsistencyCount, a.InconsistencyAvgMS, a.InconsistencyMinMS, a.InconsistencyMaxMS, a.InconsistencyStdMS,
 			a.LatencyAvgMS, a.LatencyMinMS, a.LatencyMaxMS, a.LatencyStdMS)
