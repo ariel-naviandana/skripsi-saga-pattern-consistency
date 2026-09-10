@@ -39,17 +39,20 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 |----------|----------|------|-----------|-------------|--------------|---------------------------|--------------|
 | S7 | choreography | 15000 | 15000 | 0 | 100.0 | 5152 | 8476 |
 | S7 | orchestration | 15000 | 14976 | 24 | 99.8 | 453 | 5021 |
-| S8 | choreography | 30 | 0 | 0 | 30 | 0 | 0 | 0 | 0.0 (stuck) | 0 | 12349 |
-| S9 | orchestration | 30 | 0 | 30 | 0 | 0 | 0 | 30 | 100.0 (needless, 100%) | 10048 | 10159 |
-| S9s | orchestration | 30 | 0 | 30 | 0 | 0 | 0 | 30 | 100.0 (needless, 100%) | 10035 | 10130 |
-| S2s | orchestration | 30 | 0 | 30 | 0 | 0 | 0 | 0 | 100.0 | 28 | 166 |
-| S3s | orchestration | 30 | 0 | 30 | 0 | 0 | 0 | 0 | 100.0 | 24 | 145 |
 
 \* Unrecorded = request yang gagal terkirim/mendapat respons di pintu masuk saat
 puncak beban (koneksi diputus paksa); transaksi tidak pernah dimulai, bukan
-inkonsistensi data. S8/S9 (event/response loss) dijalankan 10× untuk observasi;
-latency-nya mencakup window konfirmasi (±10 detik quiescence/timeout) karena saga
-tidak pernah selesai normal.
+
+### Skenario sinyal koordinasi hilang (S8, S9, S9s — 30 iterasi)
+
+| Skenario | Approach | Txns | Committed | Compensated | Inconsistent | Consistency% | CTSR% | Needless | Inconsistency window (ms) | Latency (ms) |
+|----------|----------|------|-----------|-------------|--------------|--------------|-------|----------|---------------------------|--------------|
+| S8 | choreography | 30 | 0 | 0 | 30 | 0.0 | 0.0 | 0 | 0 (stuck) | 12349 |
+| S9 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 30 (100%) | 10048 | 10159 |
+| S9s | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 30 (100%) | 10035 | 10130 |
+inkonsistensi data. S8/S9/S9s (event/response loss) dijalankan 30×; latency-nya
+mencakup window konfirmasi (±10 detik quiescence/timeout) karena saga tidak
+pernah selesai normal.
 
 ## Uji Signifikansi Statistik (Mann-Whitney U)
 
