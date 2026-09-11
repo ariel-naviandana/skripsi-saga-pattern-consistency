@@ -37,8 +37,8 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 
 | Skenario | Approach | Txns | Committed | Unrecorded* | Consistency% | Inconsistency window (ms) | Latency (ms) |
 |----------|----------|------|-----------|-------------|--------------|---------------------------|--------------|
-| S7 | choreography | 15000 | 15000 | 0 | 100.0 | 5152 | 8476 |
-| S7 | orchestration | 15000 | 14976 | 24 | 99.8 | 453 | 5021 |
+| S7 | choreography | 15000 | 15000 | 0 | 100.0 | 2818 | 7170 |
+| S7 | orchestration | 15000 | 14420 | 580 | 96.1 | 465 | 3867 |
 
 \* Unrecorded = request yang gagal terkirim/mendapat respons di pintu masuk saat
 puncak beban (koneksi diputus paksa); transaksi tidak pernah dimulai, bukan
@@ -73,8 +73,8 @@ Perbandingan choreography vs orchestration per skenario menggunakan
 | S3 | **recovery time** | **12,8 ± 3,0** | **26,0 ± 6,5** | **<0,0001** | **ya** |
 | S6 | latency | 122,9 ± 22,7 | 156,2 ± 30,0 | <0,0001 | ya |
 | S6 | inconsistency window | 27,7 ± 6,8 | 41,7 ± 8,2 | <0,0001 | ya |
-| S7 | latency | 8476,1 ± 1541,5 | 5021,1 ± 681,3 | <0,0001 | ya |
-| S7 | inconsistency window | 5152,0 ± 1428,9 | 453,3 ± 282,6 | <0,0001 | ya |
+| S7 | latency | 7170,4 ± 1297,6 | 3867,1 ± 534,1 | <0,0001 | ya |
+| S7 | inconsistency window | 2817,6 ± 906,8 | 462,7 ± 133,4 | <0,0001 | ya |
 
 **Selective vs call-all (dalam orchestration, n=30):**
 
@@ -167,14 +167,14 @@ compensating transaction.
 Hasil setelah perbaikan metodologi pengukuran (deteksi quiescence berbasis
 `created_at` `saga_log`): **kedua pendekatan 100% konsisten** untuk seluruh
 transaksi yang diproses. Perbedaan utama:
-- **Periode inkonsistensi sementara**: choreography ±5152 ms vs orchestration
+- **Periode inkonsistensi sementara**: choreography ±2818 ms vs orchestration
   ±628 ms — ±8× lebih lama. Rantai event Kafka dengan partisi tunggal
   mengantri 500 transaksi secara serial, sehingga transaksi terakhir berada
   dalam kondisi parsial selama beberapa detik.
-- **Latency end-to-end**: choreography ±8476 ms vs orchestration ±5010 ms.
+- **Latency end-to-end**: choreography ±7170 ms vs orchestration ±3867 ms.
 - **Availability pintu masuk**: choreography memproses seluruh 15.000 transaksi;
-  orchestration kehilangan **24 request (0,16%)** saat puncak beban — fluktuasi
-  run-to-run tinggi (run lain: 82, 0) menunjukkan bahwa kejenuhan titik tunggal
+  orchestration kehilangan **580 request (3,87%)** saat puncak beban — fluktuasi
+  run-to-run tinggi menunjukkan bahwa kejenuhan orchestrator sebagai titik tunggal
   bukan pola deterministik melainkan **kondisi intermittent**.
 
 **Root cause fluktuasi (terverifikasi dari data):** error message aktual yang
