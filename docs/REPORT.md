@@ -414,18 +414,21 @@ pada response loss).
   (`CreateOrder`, `ProcessPayment`, `ReserveInventory`, `ScheduleShipping` +
   4 compensate) membungkus INSERT/UPDATE ke tabel bisnis dan INSERT ke
   `saga_log` sebagai **dua statement terpisah yang masing-masing auto-commit**
-  (tidak dalam satu database transaction). Gap window antara keduanya sangat
-  kecil (~mikrodetik), dan spot-check terhadap 500 transaksi S7 (data terakhir
-  yang masih ada di DB sebelum reset) tidak menemukan orfan — namun ini
-  verifikasi terhadap 1 run, bukan seluruh 300+ run historis (karena
-  `reset.sh` menghapus data mentah antar iterasi).
+  (tidak dalam satu database transaction). Spot-check terhadap 500 transaksi
+  S7 tidak menemukan orfan (terverifikasi untuk S7 tanpa kompensasi).
+  Namun pada skenario dengan kompensasi call-all (S2, S3, S6), service yang
+  tidak berpartisipasi tetap menerima panggilan compensate — `writeLog`
+  menulis entri `"compensated"` ke `saga_log` meski tabel bisnis kosong
+  untuk saga tersebut (terverifikasi empiris: S2 Shipping, S3 Inventory).
+  Entri palsu ini tidak memengaruhi klasifikasi outcome (checker baca dari
+  tabel bisnis) atau metrik agregat (analyze tool baca dari JSON).
 - **Partial idempotency compensate (B2).** Compensate functions memiliki
   status guard (`WHERE status = 'committed'`) sehingga UPDATE aman dipanggil
   berkali-kali. Namun `writeLog()` menulis duplikat ke `saga_log` tanpa
-  `ON CONFLICT` — pemanggilan kedua akan menghasilkan baris saga_log
-  duplikat. Ini tidak memengaruhi metrik agregat karena analyze tool baca
-  dari JSON (bukan query DB), dan workload-generator pakai per-saga queries
-  (bukan COUNT/GROUP BY).
+  `ON CONFLICT`. Cakupan masalah lebih luas dari yang awalnya didokumentasikan:
+  bukan cuma risiko double-invocation, tapi juga manifestation dari
+  call-all mode — service yang tidak pernah commit tetap mendapat entri
+  saga_log `"compensated"` palsu (lihat B1 di atas).
 - **Inventory Service tanpa validasi stok (B3).** Proposal section 3.2.1
   menyebutkan Inventory Service "mengurangi stok", namun implementasi hanya
   mencatat reservasi (append-only log) tanpa kolom `stock` atau validasi
@@ -439,6 +442,35 @@ pada response loss).
   tidak sama rata ke kedua pendekatan — ini **asumsi yang belum diverifikasi
   secara empiris** dan merupakan potensi confounding factor tambahan yang
   belum diisolasi.
+- **Kebocoran SELECTIVE_COMPENSATE antar-run (T1).** PowerShell `$env:VAR`
+  persist dalam satu sesi terminal. Sebelum perbaikan, `$env:SELECTIVE_COMPENSATE`
+  hanya di-set eksplisit di branch S9/S9s/S2s/S3s — branch lain (S1-S8) tidak
+  menyentuhnya. Kalau S9s/S2s/S3s dijalankan duluan di satu sesi, nilai `true`
+  tertinggal dan S2/S3/S6/S8 bisa ikut terpengaruh. Diperbaiki: semua branch
+  sekarang secara eksplisit set `$env:SELECTIVE_COMPENSATE = "false"`.
+- **Entri saga_log palsu di call-all mode (T2).** Mode call-all (default)
+  memanggil compensate ke SEMUA service, termasuk yang tidak pernah commit.
+  `writeLog()` menulis `"compensated"` tanpa mengecek apakah service tersebut
+  benar-benar berpartisipasi. Terverifikasi empiris: S2 Shipping punya entri
+  saga_log `"compensated"` tapi tabel bisnis kosong; S3 Inventory pola yang
+  sama. Entri palsu tidak memengaruhi klasifikasi outcome (checker baca tabel
+  bisnis) atau Timeline() (Order selalu dipanggil terakhir, jadi timestamp
+  asli tetap jadi `final`).
+- **Attempt counter global per proses (T5).** `ShouldFail()` menambah counter
+  `attempt` di SETIAP pemanggilan fungsi bisnis (forward + compensate) dalam
+  satu service, bukan per-step. Untuk `FAIL_AT_ATTEMPT=1` (semua skenario
+  saat ini), ini tidak berpengaruh. Namun untuk `FAIL_AT_ATTEMPT>1`,
+  behavior akan meleset dari ekspektasi — counter menghitung total pemanggilan
+  ke SELURUH fungsi bisnis, bukan percobaan ke-N untuk step tertentu.
+- **Rantai kompensasi choreography bersifat topology-specific (T9).**
+  Shipping Service tidak punya consumer reverse (tidak bisa terima sinyal
+  kompensasi). Rantai reverse hanya didesain untuk "kegagalan merambat dari
+  titik mundur ke awal" — valid untuk S2/S3 yang diuji, tapi tidak
+  digeneralisasi ke pola kegagalan lain (misal Payment gagal).
+- **Amount:0 hardcode di event republish (T10).** Payment reverse-consumer
+  mem-publish `PaymentResultEvent` dengan `Amount: 0` saat kompensasi karena
+  `InventoryResultEvent` tidak memiliki field `Amount`. Tidak berdampak ke
+  hasil (`CompensateOrder` hanya memakai `SagaID`), tapi kode rapuh.
 
 ## Rekomendasi Langkah Selanjutnya
 

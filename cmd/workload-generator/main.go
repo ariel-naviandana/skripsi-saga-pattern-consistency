@@ -107,9 +107,9 @@ func main() {
 	outFile := flag.String("out", "", "optional JSON output file")
 	flag.Parse()
 
-	baseURL := "http://localhost:8081/orders"
+	baseURL := "http://127.0.0.1:8081/orders"
 	if *approach == "orchestration" {
-		baseURL = "http://localhost:8080/saga"
+		baseURL = "http://127.0.0.1:8080/saga"
 	}
 
 	ctx := context.Background()

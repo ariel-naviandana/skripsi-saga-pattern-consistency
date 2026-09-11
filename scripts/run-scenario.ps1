@@ -14,11 +14,11 @@ $outDir = "docs/runs/$Scenario/$Approach"
 New-Item -ItemType Directory -Path $outDir -Force | Out-Null
 
 switch ($Scenario) {
-  { $_ -in @("S1", "S7") } { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "" }
-  "S2" { $env:FAIL_AT_STEP = "shipping"; $env:FAIL_AT_ATTEMPT = "1"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "" }
-  "S3" { $env:FAIL_AT_STEP = "inventory"; $env:FAIL_AT_ATTEMPT = "1"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "" }
-  "S6" { $env:FAIL_AT_STEP = "inventory"; $env:FAIL_AT_ATTEMPT = "1"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "true"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "" }
-  "S8" { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = "saga.order.created"; $env:DROP_RESPONSE_AT_STEP = "" }
+  { $_ -in @("S1", "S7") } { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = ""; $env:SELECTIVE_COMPENSATE = "false" }
+  "S2" { $env:FAIL_AT_STEP = "shipping"; $env:FAIL_AT_ATTEMPT = "1"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = ""; $env:SELECTIVE_COMPENSATE = "false" }
+  "S3" { $env:FAIL_AT_STEP = "inventory"; $env:FAIL_AT_ATTEMPT = "1"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = ""; $env:SELECTIVE_COMPENSATE = "false" }
+  "S6" { $env:FAIL_AT_STEP = "inventory"; $env:FAIL_AT_ATTEMPT = "1"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "true"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = ""; $env:SELECTIVE_COMPENSATE = "false" }
+  "S8" { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = "saga.order.created"; $env:DROP_RESPONSE_AT_STEP = ""; $env:SELECTIVE_COMPENSATE = "false" }
   "S9" { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "inventory"; $env:SELECTIVE_COMPENSATE = "false" }
   "S9s" { $env:FAIL_AT_STEP = ""; $env:FAIL_AT_ATTEMPT = "0"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = "inventory"; $env:SELECTIVE_COMPENSATE = "true" }
   "S2s" { $env:FAIL_AT_STEP = "shipping"; $env:FAIL_AT_ATTEMPT = "1"; $env:DELAY_MS = "0"; $env:FAIL_ON_COMPENSATE = "false"; $env:DROP_EVENT = ""; $env:DROP_RESPONSE_AT_STEP = ""; $env:SELECTIVE_COMPENSATE = "true" }

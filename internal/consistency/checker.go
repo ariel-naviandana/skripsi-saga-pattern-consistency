@@ -30,10 +30,10 @@ type HostConfig struct {
 
 func DefaultHostConfig() HostConfig {
 	return HostConfig{
-		OrderHost:     "localhost:5431",
-		PaymentHost:   "localhost:5432",
-		InventoryHost: "localhost:5433",
-		ShippingHost:  "localhost:5434",
+		OrderHost:     "127.0.0.1:5431",
+		PaymentHost:   "127.0.0.1:5432",
+		InventoryHost: "127.0.0.1:5433",
+		ShippingHost:  "127.0.0.1:5434",
 	}
 }
 

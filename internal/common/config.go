@@ -7,18 +7,13 @@ import (
 
 // Config holds runtime settings read from environment variables.
 type Config struct {
-	Port        int
-	ServiceName string
-	DBHost      string
-	DBPort      int
-	DBUser      string
-	DBPassword  string
-	DBName      string
-	KafkaBrokers []string
-	RedisAddr   string
+	Port            int
+	ServiceName     string
+	KafkaBrokers    []string
+	RedisAddr       string
 	OrchestratorURL string
-	LogLevel    string
-	Approach    string
+	LogLevel        string
+	Approach        string
 }
 
 func EnvOr(key, def string) string {
@@ -40,18 +35,13 @@ func EnvIntOr(key string, def int) int {
 // LoadConfig reads standard env vars for a service.
 func LoadConfig(serviceName string) Config {
 	return Config{
-		Port:        EnvIntOr("PORT", 8080),
-		ServiceName: serviceName,
-		DBHost:      EnvOr("DB_HOST", ""),
-		DBPort:      EnvIntOr("DB_PORT", 5432),
-		DBUser:      EnvOr("DB_USER", ""),
-		DBPassword:  EnvOr("DB_PASSWORD", ""),
-		DBName:      EnvOr("DB_NAME", ""),
-		KafkaBrokers: splitCSV(EnvOr("KAFKA_BROKERS", "saga-kafka:9092")),
-		RedisAddr:   EnvOr("REDIS_ADDR", "saga-redis:6379"),
+		Port:            EnvIntOr("PORT", 8080),
+		ServiceName:     serviceName,
+		KafkaBrokers:    splitCSV(EnvOr("KAFKA_BROKERS", "saga-kafka:9092")),
+		RedisAddr:       EnvOr("REDIS_ADDR", "saga-redis:6379"),
 		OrchestratorURL: EnvOr("ORCHESTRATOR_URL", ""),
-		LogLevel:    EnvOr("LOG_LEVEL", "info"),
-		Approach:    EnvOr("APPROACH", "choreography"),
+		LogLevel:        EnvOr("LOG_LEVEL", "info"),
+		Approach:        EnvOr("APPROACH", "choreography"),
 	}
 }
 
