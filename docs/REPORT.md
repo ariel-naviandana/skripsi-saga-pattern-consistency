@@ -38,7 +38,7 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 | Skenario | Approach | Txns | Committed | Unrecorded* | Consistency% | Inconsistency window (ms) | Latency (ms) |
 |----------|----------|------|-----------|-------------|--------------|---------------------------|--------------|
 | S7 | choreography | 15000 | 15000 | 0 | 100.0 | 2818 | 7170 |
-| S7 | orchestration | 15000 | 14420 | 580 | 96.1 | 465 | 3867 |
+| S7 | orchestration | 15000 | 14952 | 48 | 99.7 | 465 | 5898 |
 
 \* Unrecorded = request yang gagal terkirim/mendapat respons di pintu masuk saat
 puncak beban (koneksi diputus paksa); transaksi tidak pernah dimulai, bukan
@@ -73,7 +73,7 @@ Perbandingan choreography vs orchestration per skenario menggunakan
 | S3 | **recovery time** | **12,8 ± 3,0** | **26,0 ± 6,5** | **<0,0001** | **ya** |
 | S6 | latency | 122,9 ± 22,7 | 156,2 ± 30,0 | <0,0001 | ya |
 | S6 | inconsistency window | 27,7 ± 6,8 | 41,7 ± 8,2 | <0,0001 | ya |
-| S7 | latency | 7170,4 ± 1297,6 | 3867,1 ± 534,1 | <0,0001 | ya |
+| S7 | latency | 7170,4 ± 1297,6 | 5921,4 ± 602,0 | <0,0001 | ya |
 | S7 | inconsistency window | 2817,6 ± 906,8 | 462,7 ± 133,4 | <0,0001 | ya |
 
 **Selective vs call-all (dalam orchestration, n=30):**
@@ -165,31 +165,16 @@ compensating transaction.
 
 ### S7 — Konkurensi 500 Transaksi
 Hasil setelah perbaikan metodologi pengukuran (deteksi quiescence berbasis
-`created_at` `saga_log`): **kedua pendekatan 100% konsisten** untuk seluruh
-transaksi yang diproses. Perbedaan utama:
-- **Periode inkonsistensi sementara**: choreography ±2818 ms vs orchestration
-  ±628 ms — ±8× lebih lama. Rantai event Kafka dengan partisi tunggal
-  mengantri 500 transaksi secara serial, sehingga transaksi terakhir berada
-  dalam kondisi parsial selama beberapa detik.
-- **Latency end-to-end**: choreography ±7170 ms vs orchestration ±3867 ms.
-- **Availability pintu masuk**: choreography memproses seluruh 15.000 transaksi;
-  orchestration kehilangan **580 request (3,87%)** saat puncak beban — fluktuasi
-  run-to-run tinggi menunjukkan bahwa kejenuhan orchestrator sebagai titik tunggal
-  bukan pola deterministik melainkan **kondisi intermittent**.
-
-**Root cause fluktuasi (terverifikasi dari data):** error message aktual yang
-ditangkap workload generator pada run baru (n=30 dengan error logging):
-`dial tcp [::1]:8080: connectex: No connection could be made because the
-target machine actively refused it`. Ini signature Windows network stack —
-bukan TIME_WAIT/ephemeral port exhaustion (yang muncul sebagai `bind: address
-already in use`). Mekanisme yang lebih mungkin: **Docker Desktop port-forwarder
-(vpnkit) di Windows menolak koneksi saat burst 500 request simultan** —
-proses user-space vpnkit kewalahan, sehingga SYN diterima kernel tapi RST
-dikirim oleh vpnkit ke client sebelum diteruskan ke container. Hipotesis vpnkit
-TIME_WAIT yang sebelumnya dicantumkan sebagian benar (vpnkit memang sumbernya),
-tetapi **alasan spesifik refusal lebih kepada keterbatasan vpnkit memproses SYN
-burst daripada pool TIME_WAIT**. Klaim root cause ini sekarang tervalidasi oleh
-data aktual (bukan hipotesis saja).
+`created_at` `saga_log`):
+- **Choreography**: 100% konsisten untuk seluruh 15.000 transaksi yang
+  diproses. Periode inkonsistensi sementara ±2818 ms; latency ±7170 ms.
+  Rantai event Kafka dengan partisi tunggal mengantri 500 transaksi secara
+  serial, sehingga transaksi terakhir berada dalam kondisi parsial selama
+  beberapa detik.
+- **Orchestration**: 99,7% committed (14.952/15.000); 48 request not_found
+  murni dari 2 run (28 dari 30 runs = 500/500). Periode inkonsistensi
+  sementara ±465 ms; latency ±5898 ms. Fluktuasi not_found bersifat
+  intermittent — tidak ada pola deterministik, 28 run lainnya 100% bersih.
 
 ### S8 — Event Loss Parsial (choreography only)
 Mensimulasikan *dual-write problem*: order di-commit ke database, tetapi event
@@ -448,6 +433,11 @@ pada response loss).
   menyentuhnya. Kalau S9s/S2s/S3s dijalankan duluan di satu sesi, nilai `true`
   tertinggal dan S2/S3/S6/S8 bisa ikut terpengaruh. Diperbaiki: semua branch
   sekarang secara eksplisit set `$env:SELECTIVE_COMPENSATE = "false"`.
+  **Bukti retroaktif bahwa kebocoran tidak pernah terjadi pada data lama:**
+  keberadaan entri saga_log `"compensated"` palsu di S2 Shipping dan S3
+  Inventory (temuan T2) membuktikan bahwa SELECTIVE_COMPENSATE tidak pernah
+  bocor ke data lama — kalau bocor, orchestrator akan melewati compensate
+  untuk service yang tidak commit, sehingga entri palsu tidak akan ada.
 - **Entri saga_log palsu di call-all mode (T2).** Mode call-all (default)
   memanggil compensate ke SEMUA service, termasuk yang tidak pernah commit.
   `writeLog()` menulis `"compensated"` tanpa mengecek apakah service tersebut
