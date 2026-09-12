@@ -172,9 +172,11 @@ Hasil setelah perbaikan metodologi pengukuran (deteksi quiescence berbasis
   serial, sehingga transaksi terakhir berada dalam kondisi parsial selama
   beberapa detik.
 - **Orchestration**: 99,7% committed (14.952/15.000); 48 request not_found
-  murni dari 2 run (28 dari 30 runs = 500/500). Periode inkonsistensi
-  sementara ±465 ms; latency ±5898 ms. Fluktuasi not_found bersifat
-  intermittent — tidak ada pola deterministik, 28 run lainnya 100% bersih.
+  dari 2 dari 30 run (~6,7% run terkena, bukan 0%). Periode inkonsistensi
+  sementara ±465 ms; latency ±5898 ms. Kejenuhan orchestrator sebagai titik
+  tunggal bersifat kondisi intermittent, bukan deterministik — fenomena dasar
+  tetap terkonfirmasi meski magnitudonya lebih presisi (48 vs 580) setelah
+  kontaminasi eksternal disingkirkan.
 
 ### S8 — Event Loss Parsial (choreography only)
 Mensimulasikan *dual-write problem*: order di-commit ke database, tetapi event
@@ -374,6 +376,12 @@ pada response loss).
 
 ## Catatan Metodologi
 
+- **Pembersihan container proyek lain sebelum batch eksperimen.** Container
+  dari proyek lain yang berjalan bersamaan (9 container tambahan: API, worker,
+  database, message broker, cache) dapat menyebabkan resource contention pada
+  Docker Desktop VM (CPU, memori, network stack), terlepas dari ada-tidaknya
+  konflik port eksplisit. Sebelum menjalankan batch skenario, pastikan
+  `docker ps` bersih dari container proyek lain.
 - Pengukuran awal S7 menghasilkan angka inconsistent yang menyesatkan karena
   checker mengklasifikasikan saga yang masih berjalan sebagai "inconsistent"
   (polling terlalu agresif, window quiescence 3 detik < jeda antar-langkah pada
