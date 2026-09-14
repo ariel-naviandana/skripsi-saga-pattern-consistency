@@ -234,7 +234,7 @@ mengisolasi apakah strategi call-all (yang selalu memanggil keempat endpoint
 kompensasi) memang menghasilkan data outcome berbeda dengan selective (yang hanya
 memanggil yang committed).
 
-Hasil (10 run, orchestration): **10/10 `compensated`** — konsisten dengan S9
+Hasil (30 run, orchestration): **30/30 `compensated`** — konsisten dengan S9
 (call-all). Pada S9s, shipping (yang tidak pernah commit) di-skip (terlihat dari
 log "skip compensate (not committed)"); order, payment, inventory (yang committed
 sebelum response di-drop) dikompensasi.
@@ -285,9 +285,8 @@ koordinasi, atau oleh fakta bahwa call-all orchestrator mengirim lebih banyak HT
 dari yang strictly perlu.
 
 Hasil (30 run, orchestration, n=30 sesuai proposal 3.6):
-- **S2s**: 10/10 compensated, recovery **28 ± 6 ms** (stabil, tanpa outlier).
-- **S3s**: 10/10 compensated, recovery **24 ± 8 ms** (sebelumnya 28 ms dengan n=10;
-  konsisten dengan estimasi awal).
+- **S2s**: 30/30 compensated, recovery **28 ± 6 ms** (stabil, tanpa outlier).
+- **S3s**: 30/30 compensated, recovery **24 ± 8 ms**.
 
 **Isolasi confounding — hasil utama untuk RM3 (dengan n=30):**
 - S3 (call-all): 26,0 ± 6,5 ms; **S3s (selective): 24 ± 8 ms** — selisih
@@ -319,18 +318,18 @@ compensation. Dengan demikian, "orchestration selalu berakhir konsisten" bukan
 properti universal pola orchestration — melainkan hasil dari keputusan desain
 spesifik implementasi ini.
 
-## Observasi S4 & S5 (otomatis, 10 run)
+## Observasi S4 & S5 (otomatis, 30 run)
 
-Dijalankan dengan `scripts/run-crash.ps1`; `DELAY_MS=3000` diset untuk
-menciptakan window crash yang deterministik (saga berjalan ~3 s per langkah,
-sehingga komponen dapat dihentikan saat transaksi masih berlangsung; tanpa
-delay, saga selesai dalam ±100 ms lebih cepat dari latency `docker stop`).
+Dijalankan dengan `scripts/run-crash.ps1 -Runs 30`; `DELAY_MS=3000` diset
+untuk menciptakan window crash yang deterministik (saga berjalan ~3 s per
+langkah, sehingga komponen dapat dihentikan saat transaksi masih berlangsung;
+tanpa delay, saga selesai dalam ±100 ms lebih cepat dari latency `docker stop`).
 
-- **S4 — Orchestrator Crash** (10 run): **10/10 inconsistent**. Pola konsisten:
+- **S4 — Orchestrator Crash** (30 run): **30/30 inconsistent**. Pola konsisten:
   Order dan Payment `committed`, Inventory/Shipping tidak berpartisipasi —
   orchestrator dihentikan saat langkah inventory masih berjalan, sehingga
   kompensasi mundur tidak pernah dieksekusi. Commit parsial permanen.
-- **S5 — Kafka Down** (10 run): **10/10 inconsistent**. Order `committed`;
+- **S5 — Kafka Down** (30 run): **30/30 inconsistent**. Order `committed`;
   Payment kadang `committed` (jika event sempat dikonsumsi sebelum broker mati)
   atau tidak berpartisipasi; Inventory/Shipping tidak pernah berpartisipasi —
   rantai event terputus tanpa mekanisme replay, saga tidak pernah selesai.

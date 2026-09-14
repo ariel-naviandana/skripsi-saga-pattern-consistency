@@ -216,8 +216,8 @@ bash scripts/run-scenario.sh S<nama> <choreography|orchestration> 30
 
 **Skenario crash (S4, S5):** pakai `run-crash.ps1` (hanya untuk Windows):
 ```powershell
-.\scripts\run-crash.ps1 -Scenario S4 -Runs 10
-.\scripts\run-crash.ps1 -Scenario S5 -Runs 10
+.\scripts\run-crash.ps1 -Scenario S4 -Runs 30
+.\scripts\run-crash.ps1 -Scenario S5 -Runs 30
 ```
 
 ### 6.3. Contoh urutan lengkap
@@ -261,8 +261,8 @@ Buka PowerShell, jalankan:
 
 **S4/S5 (crash):**
 ```powershell
-.\scripts\run-crash.ps1 -Scenario S4 -Runs 10
-.\scripts\run-crash.ps1 -Scenario S5 -Runs 10
+.\scripts\run-crash.ps1 -Scenario S4 -Runs 30
+.\scripts\run-crash.ps1 -Scenario S5 -Runs 30
 ```
 
 ### 6.4. Output yang diharapkan per skrip
@@ -587,9 +587,9 @@ docker compose down -v    # + hapus data
 | S1-S3, S6, S8 (×2 approach) | ~25 menit |
 | S7 (×2 approach, 500 tx/run) | ~25 menit |
 | S9, S9s, S2s, S3s | ~10 menit |
-| S4, S5 (crash) | ~10 menit |
+| S4, S5 (crash, 30 runs each) | ~30 menit |
 | Regenerate summary + analyze | <1 menit |
-| **TOTAL** | **~85-100 menit** (~1,5 jam) |
+| **TOTAL** | **~105-120 menit** (~2 jam) |
 
 ### 10.5. Commit history (untuk konteks git)
 
@@ -623,8 +623,8 @@ foreach ($s in @("S1","S2","S3","S6","S7")) {
 foreach ($s in @("S9","S9s","S2s","S3s")) {
     .\scripts\run-scenario.ps1 -Scenario $s -Approach orchestration -Runs 30
 }
-.\scripts\run-crash.ps1 -Scenario S4 -Runs 10
-.\scripts\run-crash.ps1 -Scenario S5 -Runs 10
+.\scripts\run-crash.ps1 -Scenario S4 -Runs 30
+.\scripts\run-crash.ps1 -Scenario S5 -Runs 30
 
 # 3. Lihat hasil
 go run ./cmd/analyze

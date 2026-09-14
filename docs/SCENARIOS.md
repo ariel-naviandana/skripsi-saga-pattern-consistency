@@ -154,14 +154,14 @@ Dijalankan otomatis via `scripts/run-crash.ps1` (10+ iterasi):
 # S4 - Orchestrator Crash (orchestration): stop orchestrator setelah order+payment
 #      commit, saat langkah inventory sedang berjalan (DELAY_MS=3000 menciptakan
 #      window crash deterministik, proposal 3.4.1)
-.\scripts\run-crash.ps1 -Scenario S4 -Runs 10
+.\scripts\run-crash.ps1 -Scenario S4 -Runs 30
 
 # S5 - Kafka Down (choreography): stop Kafka setelah order commit, rantai event
 #      terputus sebelum payment/inventory/shipping
-.\scripts\run-crash.ps1 -Scenario S5 -Runs 10
+.\scripts\run-crash.ps1 -Scenario S5 -Runs 30
 ```
 
-Hasil verifikasi (10 run): S4 dan S5 keduanya **10/10 inconsistent** (commit
+Hasil verifikasi (30 run): S4 dan S5 keduanya **30/30 inconsistent** (commit
 parsial) — lihat `docs/runs/S4/orchestration/` dan `docs/runs/S5/choreography/`.
 
 ## Reset antar Run
@@ -203,8 +203,8 @@ Data lengkap: [docs/REPORT.md](REPORT.md) dan `docs/runs/summary.json`.
 | S7 (500×30) | committed (100%, 15000/15000) | committed (100%, 14998/15000; 2 request unrecorded) |
 | S8 (10) | inconsistent (100%, stuck — event order.created di-drop) | — |
 | S9 (10) | — | compensated (100%, needless — response inventory di-drop) |
-| S4 | — | inconsistent (partial, 10/10 otomatis) |
-| S5 | inconsistent (partial, 10/10 otomatis) | — |
+| S4 | — | inconsistent (partial, 30/30) |
+| S5 | inconsistent (partial, 30/30) | — |
 
 ### Metrik tambahan (kode final)
 
