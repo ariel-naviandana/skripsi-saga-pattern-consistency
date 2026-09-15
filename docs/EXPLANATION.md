@@ -1,4 +1,4 @@
-# Penjelasan Program Skripsi (8 Tahap + Status Alignment Akhir)
+# EXPLANATION — Experiment Overview & FAQ
 
 > Dokumen rangkuman untuk penjelasan ke dosen / penilai (Claude / reviewer lain)
 > dan dasar untuk menyesuaikan slide PPT presentasi sempro. Format: 8 tahap
@@ -57,7 +57,7 @@ vs Orchestration) menggunakan Fault Injection Testing.
 
 **Penjelasan:**
 
-Sistem terdiri dari **11 container Docker**:
+Sistem terdiri dari **13 container Docker**:
 
 - **4 service** (Order, Payment, Inventory, Shipping): tiap service adalah program
   Go mandiri, HTTP API di port 8081-8084.
@@ -99,7 +99,7 @@ Misalkan customer pesan produk:
 1. **Order**: catat pesanan (status `committed`) → publish event `order.created`.
 2. **Payment**: baca event → bayar → catat pembayaran (committed) → publish
    `payment.processed`.
-3. **Inventory**: baca event → kurangi stok (committed) → publish `inventory.reserved`.
+3. **Inventory**: baca event → catat reservasi stok (committed) → publish `inventory.reserved`.
 4. **Shipping**: baca event → jadwalkan kirim (committed) → publish `shipping.scheduled`.
 
 Saga selesai: semua committed. **Recovery time: 0** (tidak ada kegagalan).
@@ -133,7 +133,7 @@ terakhir di saga_log (Order compensated). Untuk S3: **12,8 ms (choreography) vs
 
 ```
 projek-skripsi/
-├── cmd/                 → 6 binary entry points (main.go per service)
+├── cmd/                 → 7 binary entry points (main.go per service)
 │   ├── order-service/, payment-service/, inventory-service/, shipping-service/
 │   ├── orchestrator/   → saga orchestrator
 │   ├── workload-generator/ → CLI kirim N transaksi + ukur hasilnya
@@ -151,7 +151,7 @@ projek-skripsi/
 │   └── redis/           → go-redis client
 ├── deployments/         → Docker Compose
 ├── scripts/             → run-scenario.ps1/.sh, run-crash.ps1, setup.sh, reset.sh
-└── docs/                → REPORT.md, SCENARIOS.md, slide deck sempro
+└── docs/                → REPORT.md, SCENARIOS.md, EXPLANATION.md, HOW-TO-RUN.md
 ```
 
 **Prinsip layer (dari atas ke bawah):**
@@ -229,7 +229,7 @@ projek-skripsi/
 **Mekanisme fault injection non-intrusive:** hanya set env var container. Tidak
 ubah kode.
 
-**Tiga parameter fault utama** (proposal 3.4.1):
+**Empat parameter fault utama** (proposal 3.4.1):
 1. `FAIL_AT_STEP` + `FAIL_AT_ATTEMPT` → suntik kegagalan di step tertentu, pada attempt ke-N.
 2. `DELAY_MS` → simulasi layanan lambat.
 3. `FAIL_ON_COMPENSATE` → suntik kegagalan kompensasi.
@@ -281,7 +281,7 @@ ubah kode.
 **Statistik:** mean/min/max/std per skenario per pendekatan; **Mann-Whitney U**
 (n=30, dua sisi, α=0.05) untuk signifikansi selisih choreography vs orchestration.
 
-### Hasil utama (re-run final, commit #12)
+### Hasil utama (re-run final, commit #27)
 
 | Skenario | Choreo | Orch | Signifikan |
 |----------|--------|------|------------|
@@ -290,8 +290,8 @@ ubah kode.
 | **S2 recovery** | **22 ms** | **29 ms** | **ya (p=0.0002)** |
 | **S3 recovery** | **13 ms** | **26 ms** | **ya (p<0.0001)** |
 | S3 latency | 1624 ms | 150 ms | ya |
-| S7 latency | 8476 ms | 5010 ms | ya |
-| S7 window | 5152 ms | 628 ms | ya |
+| S7 latency | 7170 ms | 5898 ms | ya |
+| S7 window | 2818 ms | 465 ms | ya |
 | **S8 outcome** | — | **30/30 inconsistent + stuck** | (single-approach, n=30) |
 | **S9 outcome** | — | **30/30 compensated + needless (100%)** | (n=30) |
 | **S9s outcome** | — | **30/30 compensated (100%, identik S9)** | counterfactual RM1/RM2, n=30 |
@@ -349,13 +349,13 @@ ubah kode.
 |---|-----------|--------------|
 | 1 | "Kenapa pemulihan orchestration tidak lebih cepat?" | Karena kontrol terpusat langsung memang seharusnya lebih cepat secara intuitif, tapi eksperimen menunjukkan **call-all tidak menambah overhead** (S3s 28 ms ≈ S3 26 ms). Selisih murni arsitektural. |
 | 2 | "Kenapa pakai partisi Kafka = 1?" | Untuk mensimulasikan skenario worst-case (rantai serial). Partisi > 1 adalah rekomendasi lanjutan (sudah ditulis di REPORT.md). |
-| 3 | "Kenapa S8/S9/S9s/S2s/S3s hanya 10 run?" | Untuk observasi kualitatif counterfactual. Tidak applicable untuk uji signifikansi (single-approach). |
+| 3 | "Kenapa S8/S9/S9s/S2s/S3s dijalankan?" | S8/S9/S9s menjaga keseimbangan komparatif (satu-pendekatan, n=30). S2s/S3s mengisolasi confounding call-all (n=30). |
 | 4 | "Kenapa tidak ada retry pada kompensasi?" | Untuk mengisolasi efek fault, bukan retry. Retry adalah rekomendasi lanjutan. |
 | 5 | "Apa kontribusi utama?" | (a) Perbandingan empiris choreography vs orchestration pada konsistensi di bawah fault injection terkontrol (belum ada sebelumnya); (b) Isolasi confounding call-all via selective compensate; (c) Identifikasi kerentanan struktural di kedua pendekatan pada sinyal-koordinasi hilang. |
 
 ---
 
-## Status Alignment Akhir (setelah commit #12)
+## Status Alignment Akhir (setelah commit #27)
 
 ### Pemetaan RM → Skenario → Hasil
 
@@ -387,15 +387,15 @@ ubah kode.
 |------|-----|
 | `docs/REPORT.md` | Laporan lengkap (tabel, analisis, catatan metodologi, rekomendasi) |
 | `docs/SCENARIOS.md` | Definisi 12 skenario + fault config |
-| `docs/final-results-prompt.md` | Self-contained prompt untuk review independen |
-| `docs/ai-review-prompt.md` | Self-contained prompt untuk review awal |
+| `docs/EXPLANATION.md` | File ini |
+| `docs/HOW-TO-RUN.md` | Panduan eksekusi step-by-step |
 | `README.md` | Quick start + ringkasan skenario + cara running |
 | `cmd/workload-generator/main.go` | CLI untuk generate transaksi |
 | `cmd/analyze/main.go` | CLI untuk hitung summary + Mann-Whitney U |
 | `internal/orchestration/orchestrator.go` | Central coordinator + selective compensate |
 | `internal/common/faultinject.go` | Fault injection middleware |
 
-Commit terakhir: **#12**. Total commit: 12. Total baris kode Go: ~1500 LOC.
+Commit terakhir: **#27**. Total commit: 27. Total baris kode Go: ~2800 LOC.
 
 ---
 

@@ -1,4 +1,4 @@
-# Panduan Menjalankan Program Skripsi
+# HOW TO RUN — Execution Guide
 
 > Panduan lengkap dan detail untuk menjalankan seluruh sistem skripsi dari nol
 > (instalasi) sampai melihat hasil akhir, tanpa menggunakan opencode atau AI
@@ -53,7 +53,7 @@ Kalau ada baris yang muncul → port sudah dipakai, hentikan prosesnya dulu.
 Pastikan direktori kerja adalah root projek. Setelah `git clone` (atau dari folder projek yang sudah ada):
 ```
 projek-skripsi/
-├── cmd/                    # Binary entry points (6 service + 2 tools)
+├── cmd/                    # Binary entry points (5 services + 2 tools)
 ├── internal/               # Private logic
 ├── pkg/                    # Reusable wrappers (kafka, postgres, redis)
 ├── deployments/            # Docker Compose files
@@ -549,8 +549,7 @@ docker compose down -v    # + hapus data
 | `docs/REPORT.md` | Laporan lengkap (tabel, analisis, catatan metodologi) |
 | `docs/SCENARIOS.md` | Definisi 12 skenario + fault config |
 | `docs/HOW-TO-RUN.md` | File ini |
-| `docs/final-results-prompt.md` | Self-contained prompt untuk review independen |
-| `docs/ai-review-prompt.md` | Self-contained prompt untuk review awal |
+| `docs/EXPLANATION.md` | Penjelasan eksperimen & FAQ |
 | `README.md` | Quick start + ringkasan skenario |
 | `cmd/analyze/main.go` | CLI summary + MWU |
 | `cmd/workload-generator/main.go` | CLI generate transaksi |
