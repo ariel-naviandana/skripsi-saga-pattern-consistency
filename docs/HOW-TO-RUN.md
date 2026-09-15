@@ -548,7 +548,7 @@ docker compose down -v    # + hapus data
 |------|-----|
 | `docs/REPORT.md` | Laporan lengkap (tabel, analisis, catatan metodologi) |
 | `docs/SCENARIOS.md` | Definisi 12 skenario + fault config |
-| `docs/panduan-menjalankan.md` | File ini |
+| `docs/HOW-TO-RUN.md` | File ini |
 | `docs/final-results-prompt.md` | Self-contained prompt untuk review independen |
 | `docs/ai-review-prompt.md` | Self-contained prompt untuk review awal |
 | `README.md` | Quick start + ringkasan skenario |
@@ -600,7 +600,7 @@ docker compose down -v    # + hapus data
 - `#9`: dokumentasi caveats (call-all confounding, recovery time S9)
 - `#10`: re-run semua dengan kode final
 - `#11`: S9s selective compensate counterfactual
-- `#12`: S2s/S3s + penjelasan-8-tahap.md
+- `#12`: S2s/S3s + EXPLANATION.md
 - `#13`: update Caveat & Keterbatasan + Tahap 7 table
 - `#14`: n=30 untuk S8/S9/S9s/S2s/S3s + needless_compensation_rate + error logging + stepCommitted fallback log
 - `#15`: MWU selective-vs-call-all (n=30) + guard display N/A + S7 re-run + error_detail

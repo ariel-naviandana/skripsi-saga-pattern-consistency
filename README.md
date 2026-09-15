@@ -41,7 +41,9 @@ projek-skripsi/
 ├── docs/
 │   ├── ARCHITECTURE.md     # Diagrams & design choices
 │   ├── SCENARIOS.md        # S1-S7 definitions
-│   └── REPORT.md           # Final analysis (post-implementation)
+│   ├── REPORT.md           # Final analysis (post-implementation)
+│   ├── EXPLANATION.md      # Experiment explanation & FAQ
+│   └── HOW-TO-RUN.md       # Execution guide
 ├── docker-compose.yml      # Wrapper
 └── README.md
 ```
