@@ -19,14 +19,15 @@ type sagaResult struct {
 }
 
 type runResult struct {
-	Approach     string       `json:"approach"`
-	Count        int          `json:"count"`
-	Committed    int          `json:"committed"`
-	Compensated  int          `json:"compensated"`
-	Inconsistent int          `json:"inconsistent"`
-	NotFound     int          `json:"not_found"`
-	AvgLatencyMS float64      `json:"avg_latency_ms"`
-	Results      []sagaResult `json:"results,omitempty"`
+	Approach      string       `json:"approach"`
+	Count         int          `json:"count"`
+	Committed     int          `json:"committed"`
+	Compensated   int          `json:"compensated"`
+	Inconsistent  int          `json:"inconsistent"`
+	NotFound      int          `json:"not_found"`
+	AvgLatencyMS  float64      `json:"avg_latency_ms"`
+	ThroughputTPS float64      `json:"throughput_tps"`
+	Results       []sagaResult `json:"results,omitempty"`
 }
 
 type agg struct {
@@ -57,6 +58,10 @@ type agg struct {
 	LatencyMinMS      float64 `json:"min_latency_ms"`
 	LatencyMaxMS      float64 `json:"max_latency_ms"`
 	LatencyStdMS      float64 `json:"std_latency_ms"`
+	ThroughputAvgTPS  float64 `json:"avg_throughput_tps"`
+	ThroughputMinTPS  float64 `json:"min_throughput_tps"`
+	ThroughputMaxTPS  float64 `json:"max_throughput_tps"`
+	ThroughputStdTPS  float64 `json:"std_throughput_tps"`
 }
 
 // sigResult is one Mann-Whitney U comparison (choreography vs orchestration)
@@ -209,7 +214,7 @@ func main() {
 	flag.Parse()
 
 	var table []agg
-	scenarios := []string{"S1", "S2", "S3", "S6", "S7", "S8", "S9"}
+	scenarios := []string{"S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "S9"}
 	approaches := []string{"choreography", "orchestration"}
 	metrics := []string{"latency", "inconsistency_window", "recovery_time"}
 
@@ -233,7 +238,7 @@ func main() {
 			runs := 0
 			needlessCount := 0
 			var runConsistency, runCompSuccess []float64
-			var latencies, recoveries, inconsistencies []float64
+			var latencies, recoveries, inconsistencies, throughputs []float64
 			for _, f := range files {
 				data, err := os.ReadFile(f)
 				if err != nil {
@@ -288,6 +293,9 @@ func main() {
 				if nInc > 0 {
 					perRun[s][a]["inconsistency_window"] = append(perRun[s][a]["inconsistency_window"], runInc/float64(nInc))
 				}
+				if rr.ThroughputTPS > 0 {
+					throughputs = append(throughputs, rr.ThroughputTPS)
+				}
 			}
 			if runs == 0 {
 				continue
@@ -295,6 +303,7 @@ func main() {
 			recMin, recMax := minMax(recoveries)
 			incMin, incMax := minMax(inconsistencies)
 			latMin, latMax := minMax(latencies)
+			tpsMin, tpsMax := minMax(throughputs)
 			table = append(table, agg{
 				Scenario:        s,
 				Approach:        a,
@@ -328,6 +337,10 @@ func main() {
 				LatencyMinMS:    latMin,
 				LatencyMaxMS:    latMax,
 				LatencyStdMS:    sampleStd(latencies),
+				ThroughputAvgTPS: mean(throughputs),
+				ThroughputMinTPS: tpsMin,
+				ThroughputMaxTPS: tpsMax,
+				ThroughputStdTPS: sampleStd(throughputs),
 			})
 		}
 	}
@@ -339,17 +352,18 @@ func main() {
 		return table[i].Approach < table[j].Approach
 	})
 
-	fmt.Println("Scenario | Approach | Runs | Txns | Committed | Compensated | Inconsistent | NotFound | Unrecorded | Needless | Needless% | Consistency% | CompSuccess% | Rec# | AvgRec(ms) | MinRec | MaxRec | StdRec | Inc# | AvgInc(ms) | MinInc | MaxInc | StdInc | AvgLat(ms) | MinLat | MaxLat | StdLat")
-	fmt.Println("-------- | -------- | ---- | ---- | --------- | ----------- | ------------ | -------- | ---------- | -------- | --------- | ------------ | ------------ | ---- | ---------- | ------ | ------ | ------ | ---- | ---------- | ------ | ------ | ------ | ---------- | ------ | ------ | ------")
+	fmt.Println("Scenario | Approach | Runs | Txns | Committed | Compensated | Inconsistent | NotFound | Unrecorded | Needless | Needless% | Consistency% | CompSuccess% | Rec# | AvgRec(ms) | MinRec | MaxRec | StdRec | Inc# | AvgInc(ms) | MinInc | MaxInc | StdInc | AvgLat(ms) | MinLat | MaxLat | StdLat | AvgTPS | MinTPS | MaxTPS | StdTPS")
+	fmt.Println("-------- | -------- | ---- | ---- | --------- | ----------- | ------------ | -------- | ---------- | -------- | --------- | ------------ | ------------ | ---- | ---------- | ------ | ------ | ------ | ---- | ---------- | ------ | ------ | ------ | ---------- | ------ | ------ | ------ | ------ | ------ | ------ | ------")
 	for _, a := range table {
 		recVals := naIfZero(a.RecoveryCount, a.RecoveryAvgMS, a.RecoveryMinMS, a.RecoveryMaxMS, a.RecoveryStdMS)
 		incVals := naIfZero(a.InconsistencyCount, a.InconsistencyAvgMS, a.InconsistencyMinMS, a.InconsistencyMaxMS, a.InconsistencyStdMS)
-		fmt.Printf("%s | %s | %d | %d | %d | %d | %d | %d | %d | %d | %.0f | %.1f | %.1f | %d | %s | %s | %s | %s | %d | %s | %s | %s | %s | %.0f | %.0f | %.0f | %.0f\n",
+		fmt.Printf("%s | %s | %d | %d | %d | %d | %d | %d | %d | %d | %.0f | %.1f | %.1f | %d | %s | %s | %s | %s | %d | %s | %s | %s | %s | %.0f | %.0f | %.0f | %.0f | %.1f | %.1f | %.1f | %.1f\n",
 			a.Scenario, a.Approach, a.Runs, a.Transactions, a.Committed, a.Compensated,
 			a.InconsistencyCount, a.NotFound, a.Unrecorded, a.NeedlessCount, a.NeedlessRate, a.ConsistencyRate, a.CompSuccessRate, a.RecoveryCount,
 			recVals[0], recVals[1], recVals[2], recVals[3],
 			a.InconsistencyCount, incVals[0], incVals[1], incVals[2], incVals[3],
-			a.LatencyAvgMS, a.LatencyMinMS, a.LatencyMaxMS, a.LatencyStdMS)
+			a.LatencyAvgMS, a.LatencyMinMS, a.LatencyMaxMS, a.LatencyStdMS,
+			a.ThroughputAvgTPS, a.ThroughputMinTPS, a.ThroughputMaxTPS, a.ThroughputStdTPS)
 	}
 
 	out, _ := json.MarshalIndent(table, "", "  ")

@@ -44,7 +44,7 @@ di titik publish (producer melaporkan sukses, pesan tidak pernah sampai ke broke
 Broker Kafka tetap hidup; hanya 1 event pertama yang hilang (`DROP_EVENT`,
 one-shot via atomic flag di `FaultConfig.ShouldDropEvent`).
 
-Hasil (10 run): **10/10 inconsistent** — Order `committed`, Payment/Inventory/Shipping
+Hasil (30 run): **30/30 inconsistent** — Order `committed`, Payment/Inventory/Shipping
 tidak berpartisipasi, tidak ada marker kegagalan sehingga kompensasi tidak terpicu;
 saga **stuck permanen** tanpa mekanisme yang menyelamatkan (tanpa outbox/replay).
 Orchestration secara struktural kebal terhadap kondisi ini (pemanggilan HTTP langsung,
@@ -59,7 +59,7 @@ melewati timeout orchestrator 10 detik, `DROP_RESPONSE_AT_STEP=inventory`, one-s
 Orchestrator menyimpulkan step gagal dan menjalankan kompensasi penuh — padahal semua
 langkah sebenarnya sukses (over-compensation / in-doubt).
 
-Hasil (10 run): **10/10 `compensated` dengan flag `needless_compensation=true`** —
+Hasil (30 run): **30/30 `compensated` dengan flag `needless_compensation=true`** —
 order, payment, inventory committed lalu semuanya dikompensasi; tidak ada marker
 kegagalan. Konsistensi data **terjaga 100%** (semua service mencapai status akhir
 compensated), tetapi transaksi yang seharusnya valid **dibatalkan sia-sia** (false
