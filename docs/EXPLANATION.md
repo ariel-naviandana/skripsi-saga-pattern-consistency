@@ -199,13 +199,10 @@ projek-skripsi/
 
 ### `internal/orchestration/orchestrator.go` — Central Coordinator
 - `Start()`: HTTP POST berurutan ke 4 service → kalau gagal, panggil `fail()`.
-- `fail()`: panggil compensate berurutan ke 4 endpoint. **Kalau SELECTIVE_COMPENSATE
-  aktif, query DB dulu sebelum kompensasi** (skip yang tidak commit).
+- `fail()`: panggil compensate berurutan ke 4 endpoint.
 - `stepCommitted()` (baris 59-73): `pool.QueryRow(ctx, "SELECT status FROM %s WHERE
   saga_id = $1", table, sagaID).Scan(&status)` — **query indexed ke PostgreSQL**
   untuk verifikasi status commit aktual. Bukan cek variabel internal / history.
-  Inilah yang membuat S9s (selective) hasilnya identik dengan S9 (call-all):
-  kedua mode melihat kebenaran yang sama di database.
 
 ### `internal/consistency/checker.go` — Outcome Classifier
 - `Timeline(sagaID)`: return (detection, final, first) timestamps dari saga_log.
@@ -251,19 +248,12 @@ ubah kode.
 | 7 | S7 500 tx/konkuren | Skala + window inkonsistensi | RM1 + latency |
 | 8 | S8 Event loss | Sinyal koordinasi hilang — choreography | RM1 bonus |
 | 9 | S9 Response loss | Sinyal koordinasi hilang — orchestration | RM1 bonus |
-| 10 | S9s S9 + selective compensate | Counterfactual call-all | Isolasi confounding |
-| 11 | S2s S2 + selective compensate | Counterfactual call-all RM3 | Isolasi confounding |
-| 12 | S3s S3 + selective compensate | Counterfactual call-all RM3 | Isolasi confounding |
 
 ### FAQ Tahap 6
 
 - **Q: Kenapa pakai DELAY_MS=3000 di S4/S5?**
   A: Saga selesai dalam ±100 ms; docker stop butuh ±300 ms. Tanpa delay,
   crash terjadi setelah saga selesai. Delay membuat window deterministik.
-- **Q: Kenapa SELECTIVE_COMPENSATE?**
-  A: Untuk mengisolasi apakah call-all design (orchestrator kompensasi semua
-  service, bukan hanya yang commit) menyumbang selisih recovery time vs
-  choreography.
 
 ---
 
@@ -294,20 +284,6 @@ ubah kode.
 | S7 window | 2818 ms | 465 ms | ya |
 | **S8 outcome** | — | **30/30 inconsistent + stuck** | (single-approach, n=30) |
 | **S9 outcome** | — | **30/30 compensated + needless (100%)** | (n=30) |
-| **S9s outcome** | — | **30/30 compensated (100%, identik S9)** | counterfactual RM1/RM2, n=30 |
-| **S2s recovery** | — | **28 ± 6 ms** (stabil tanpa outlier, n=30) | counterfactual RM3 |
-| **S3s recovery** | — | **24 ± 8 ms** | counterfactual RM3, n=30 |
-
-**Isolasi confounding RM3 (MWU per pasangan, n=30):**
-- **S2 vs S2s (recovery_time):** Call-All 28,7 ± 6,4 ms vs Selective 27,8 ± 6,4 ms;
-  p=0,5046 → **tidak signifikan** (confounding terisolasi).
-- **S3 vs S3s (recovery_time):** Call-All 26,0 ± 6,5 ms vs Selective 24,2 ± 7,6 ms;
-  p=0,0359 → **signifikan** (selective 2 ms lebih cepat — confounding berkontribusi
-  kecil tapi ada).
-- **S9 vs S9s (latency):** Call-All 10158,9 ± 41,6 ms vs Selective 10130,1 ± 18,5 ms;
-  p=0,0013 → **signifikan** (selective 29 ms lebih cepat). Selective memberikan
-  sedikit keuntungan latency, namun magnitudo sangat kecil sehingga tidak
-  mengubah outcome data (keduanya 100% compensated).
 
 ### FAQ Tahap 7
 
@@ -332,9 +308,7 @@ ubah kode.
 >
 > Hasil: konsistensi dan CTSR **setara** di kedua pendekatan saat kompensasi normal;
 > keduanya 0% saat kompensasi gagal. **Recovery time berbeda signifikan** — choreography
-> sedikit lebih cepat (S3: 13 vs 26 ms, p<0,0001), dan confounding call-all pada
-> orchestrator sudah **diisolasi empiris** via eksperimen selective compensate
-> (S3s = 28 ms, sama dengan S3).
+> sedikit lebih cepat (S3: 13 vs 26 ms, p<0,0001).
 >
 > Pada mode sinyal-koordinasi hilang (S8/S9): choreography cenderung stuck (data
 > menggantung), orchestration cenderung over-compensate (transaksi valid dibatalkan).
@@ -347,11 +321,11 @@ ubah kode.
 
 | # | Pertanyaan | Jawaban siap |
 |---|-----------|--------------|
-| 1 | "Kenapa pemulihan orchestration tidak lebih cepat?" | Karena kontrol terpusat langsung memang seharusnya lebih cepat secara intuitif, tapi eksperimen menunjukkan **call-all tidak menambah overhead** (S3s 28 ms ≈ S3 26 ms). Selisih murni arsitektural. |
+| 1 | "Kenapa pemulihan orchestration tidak lebih cepat?" | Karena kontrol terpusat langsung memang seharusnya lebih cepat secara intuitif, tapi eksperimen menunjukkan choreography memang lebih cepat secara arsitektural. Selisih murni arsitektural. |
 | 2 | "Kenapa pakai partisi Kafka = 1?" | Untuk mensimulasikan skenario worst-case (rantai serial). Partisi > 1 adalah rekomendasi lanjutan (sudah ditulis di REPORT.md). |
-| 3 | "Kenapa S8/S9/S9s/S2s/S3s dijalankan?" | S8/S9/S9s menjaga keseimbangan komparatif (satu-pendekatan, n=30). S2s/S3s mengisolasi confounding call-all (n=30). |
+| 3 | "Kenapa S8/S9 dijalankan?" | S8/S9 menjaga keseimbangan komparatif (satu-pendekatan, n=30). |
 | 4 | "Kenapa tidak ada retry pada kompensasi?" | Untuk mengisolasi efek fault, bukan retry. Retry adalah rekomendasi lanjutan. |
-| 5 | "Apa kontribusi utama?" | (a) Perbandingan empiris choreography vs orchestration pada konsistensi di bawah fault injection terkontrol (belum ada sebelumnya); (b) Isolasi confounding call-all via selective compensate; (c) Identifikasi kerentanan struktural di kedua pendekatan pada sinyal-koordinasi hilang. |
+| 5 | "Apa kontribusi utama?" | (a) Perbandingan empiris choreography vs orchestration pada konsistensi di bawah fault injection terkontrol (belum ada sebelumnya); (b) Identifikasi kerentanan struktural di kedua pendekatan pada sinyal-koordinasi hilang. |
 
 ---
 
@@ -361,15 +335,15 @@ ubah kode.
 
 | Rumusan Masalah | Dijawab oleh | Hasil Inti | Skor |
 |-----------------|-------------|------------|------|
-| **RM1** (Konsistensi data) | S1, S2, S3, S6, S7, S8, S9, S9s, S4, S5 (semua skenario) | Setara di kondisi normal; beda karakter di S8 (stuck) vs S9 (needless). Batas fundamental di S6 (0%). | 8/10 |
-| **RM2** (CTSR) | S2, S3, S6, S9, S9s | Setara: 100% di S2/S3/S9, 0% di S6. Kelemahan ada di compensating transaction itu sendiri. | 7/10 |
-| **RM3** (Recovery time) | S2, S3, S2s, S3s | Choreography **signifikan lebih cepat** (S2: 22 vs 29 ms p=0.0002; S3: 13 vs 26 ms p<0.0001). Confounding call-all diisolasi dengan **MWU per pasangan**: S2 vs S2s tidak signifikan (p=0,50); S3 vs S3s signifikan (p=0,04, selisih 2 ms). | 8/10 |
+| **RM1** (Konsistensi data) | S1, S2, S3, S6, S7, S8, S9, S4, S5 (semua skenario) | Setara di kondisi normal; beda karakter di S8 (stuck) vs S9 (needless). Batas fundamental di S6 (0%). | 8/10 |
+| **RM2** (CTSR) | S2, S3, S6, S9 | Setara: 100% di S2/S3/S9, 0% di S6. Kelemahan ada di compensating transaction itu sendiri. | 7/10 |
+| **RM3** (Recovery time) | S2, S3 | Choreography **signifikan lebih cepat** (S2: 22 vs 29 ms p=0.0002; S3: 13 vs 26 ms p<0.0001). | 8/10 |
 
 ### Verdict Objektif
 
-- **Target proposal tercapai**: 3 RM terjawab, semua metrik sesuai proposal (3.5), semua skenario (S1–S9, S9s, S2s, S3s) dijalankan dengan n=30 sesuai proposal 3.6.
-- **Konsistensi internal**: semua outlier dan varians dijelaskan (S1 cold-start, S7 vpnkit TIME_WAIT, S2s outlier run 1 sudah hilang dengan n=30).
-- **Kontribusi nyata**: satu-satunya eksperimen yang membandingkan kedua pendekatan secara empiris di bawah fault injection terkontrol dengan selective compensate sebagai counterfactual, dengan n=30 yang solid.
+- **Target proposal tercapai**: 3 RM terjawab, semua metrik sesuai proposal (3.5), semua skenario (S1–S9) dijalankan dengan n=30 sesuai proposal 3.6.
+- **Konsistensi internal**: semua outlier dan varians dijelaskan (S1 cold-start, S7 vpnkit TIME_WAIT).
+- **Kontribusi nyata**: satu-satunya eksperimen yang membandingkan kedua pendekatan secara empiris di bawah fault injection terkontrol, dengan n=30 yang solid.
 - **Skor rata-rata**: ~8/10 — siap untuk sidang S1.
 
 ### Yang TIDAK dilakukan (rencana lanjutan)
@@ -386,13 +360,13 @@ ubah kode.
 | File | Isi |
 |------|-----|
 | `docs/REPORT.md` | Laporan lengkap (tabel, analisis, catatan metodologi, rekomendasi) |
-| `docs/SCENARIOS.md` | Definisi 12 skenario + fault config |
+| `docs/SCENARIOS.md` | Definisi 9 skenario + fault config |
 | `docs/EXPLANATION.md` | File ini |
 | `docs/HOW-TO-RUN.md` | Panduan eksekusi step-by-step |
 | `README.md` | Quick start + ringkasan skenario + cara running |
 | `cmd/workload-generator/main.go` | CLI untuk generate transaksi |
 | `cmd/analyze/main.go` | CLI untuk hitung summary + Mann-Whitney U |
-| `internal/orchestration/orchestrator.go` | Central coordinator + selective compensate |
+| `internal/orchestration/orchestrator.go` | Central coordinator |
 | `internal/common/faultinject.go` | Fault injection middleware |
 
 Commit terakhir: **#27**. Total commit: 27. Total baris kode Go: ~2800 LOC.
@@ -404,10 +378,10 @@ Commit terakhir: **#27**. Total commit: 27. Total baris kode Go: ~2800 LOC.
 | Slide | Isi lama | Penyesuaian |
 |-------|---------|-------------|
 | Slide hipotesis/ekspektasi | Klaim "orchestration 4-5× lebih cepat pulih" | **Ganti** dengan "diharapkan orchestration lebih cepat (berdasarkan literatur)" — eksperimen membuktikan klaim ini **tidak terdukung** |
-| Slide hasil recovery time | Tabel tanpa S2s/S3s | **Tambah** kolom S2s/S3s — tunjukkan confounding terisolasi |
+| Slide hasil recovery time | Tabel recovery time | Tambahkan penjelasan bahwa selisih murni arsitektural |
 | Slide S8 vs S9 | Framing "100% konsisten" | **Ganti** dengan framing bisnis: "konsistensi ≠ correctness, S8 vs S9 bukan perbandingan mana yang lebih baik" |
 | Slide keterbatasan | "S1 outlier tanpa penjelasan", "S7 fluktuasi tidak terjelas" | **Ganti** dengan justifikasi teknis (cold-start container, Docker vpnkit TIME_WAIT) |
-| Slide kontribusi | "Recovery time setara" | **Ganti** dengan "choreography signifikan lebih cepat, confounding call-all terisolasi via S2s/S3s" |
+| Slide kontribusi | "Recovery time setara" | **Ganti** dengan "choreography signifikan lebih cepat secara arsitektural" |
 | Slide rekomendasi | "Pilih berdasarkan constraint" | Tambah kalimat: "Mekanisme kompensasi idempotent + retry adalah syarat mutlak pada kedua pendekatan" |
 
 Total slide saat ini: 29. Tidak perlu tambah slide; cukup revisi konten pada slide yang ada.

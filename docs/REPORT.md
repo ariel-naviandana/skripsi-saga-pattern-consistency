@@ -27,9 +27,8 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 | S1 | orchestration | 30 | 30 | 0 | 0 | 100.0 | — | — | 26 | 128 |
 | S2 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 22 | 49 | 1639 |
 | S2 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 29 | 52 | 163 |
-| S2s | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 28 | 56 | 166 |
 | S3 | choreography | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 13 | 27 | 1624 |
-| S3s | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 24 | 42 | 145 |
+| S3 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 26 | 40 | 150 |
 | S6 | choreography | 30 | 0 | 0 | 30 | 0.0 | 0.0 | tak pulih | 28 | 123 |
 | S6 | orchestration | 30 | 0 | 0 | 30 | 0.0 | 0.0 | tak pulih | 42 | 156 |
 
@@ -43,14 +42,13 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
 \* Unrecorded = request yang gagal terkirim/mendapat respons di pintu masuk saat
 puncak beban (koneksi diputus paksa); transaksi tidak pernah dimulai, bukan
 
-### Skenario sinyal koordinasi hilang (S8, S9, S9s — 30 iterasi)
+### Skenario sinyal koordinasi hilang (S8, S9 — 30 iterasi)
 
 | Skenario | Approach | Txns | Committed | Compensated | Inconsistent | Consistency% | CTSR% | Needless | Inconsistency window (ms) | Latency (ms) |
 |----------|----------|------|-----------|-------------|--------------|--------------|-------|----------|---------------------------|--------------|
 | S8 | choreography | 30 | 0 | 0 | 30 | 0.0 | 0.0 | 0 | 0 (stuck) | 12349 |
 | S9 | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 30 (100%) | 10048 | 10159 |
-| S9s | orchestration | 30 | 0 | 30 | 0 | 100.0 | 100.0 | 30 (100%) | 10035 | 10130 |
-inkonsistensi data. S8/S9/S9s (event/response loss) dijalankan 30×; latency-nya
+inkonsistensi data. S8/S9 (event/response loss) dijalankan 30×; latency-nya
 mencakup window konfirmasi (±10 detik quiescence/timeout) karena saga tidak
 pernah selesai normal.
 
@@ -76,14 +74,6 @@ Perbandingan choreography vs orchestration per skenario menggunakan
 | S7 | latency | 7170,4 ± 1297,6 | 5921,4 ± 602,0 | <0,0001 | ya |
 | S7 | inconsistency window | 2817,6 ± 906,8 | 462,7 ± 133,4 | <0,0001 | ya |
 
-**Selective vs call-all (dalam orchestration, n=30):**
-
-| Pasangan | Metrik | Call-All (ms) | Selective (ms) | p-value | Signifikan |
-|----------|--------|---------------|----------------|---------|------------|
-| S2 vs S2s | recovery | 28,7 ± 6,4 | 27,8 ± 6,4 | 0,5046 | **tidak** |
-| S3 vs S3s | recovery | 26,0 ± 6,5 | 24,2 ± 7,6 | 0,0359 | **ya** (selective lebih cepat 2 ms) |
-| S9 vs S9s | latency | 10158,9 ± 41,6 | 10130,1 ± 18,5 | 0,0013 | **ya** (selective lebih cepat 29 ms) |
-
 **Interpretasi:**
 - **Recovery time (S2/S3)**: perbedaan **signifikan** — choreography pulih lebih
   cepat (p<0,001). Magnitudo kecil (±5–13 ms); secara praktis keduanya pulih
@@ -99,13 +89,6 @@ Perbandingan choreography vs orchestration per skenario menggunakan
 - **Window inkonsistensi S2** (ada kegagalan): tidak berbeda signifikan.
 - **Latency & window inkonsistensi beban tinggi (S7)**: berbeda signifikan,
   orchestration jauh lebih cepat/singkat.
-- **Selective vs call-all (dalam orchestration, n=30):** S2 vs S2s recovery
-  time p=0,50 (tidak signifikan — confounding terisolasi untuk S2); S3 vs S3s
-  p=0,04 (signifikan, selisih 2 ms — selective sedikit lebih cepat); S9 vs S9s
-  latency p=0,001 (signifikan, selisih 29 ms — selective lebih cepat). Selective
-  compensate memberikan **kecepatan sedikit lebih tinggi** pada S3 dan S9, namun
-  magnitudo sangat kecil (±2–29 ms) sehingga secara praktis tidak mengubah
-  outcome data.
 - **S8 dan S9 dieksklusi dari uji ini**: keduanya skenario eksklusif
   satu-pendekatan (S8: choreography only, S9: orchestration only) sehingga tidak
   memiliki pasangan untuk dibandingkan — hasilnya dilaporkan secara deskriptif
@@ -223,89 +206,6 @@ menggantung tanpa penyelesaian. Temuan ini selaras dengan analisis Malyuga et
 al. (2020) bahwa endpoint idempotent dan pemulihan state diperlukan pada
 sistem berbasis orchestrator.
 
-### S9s — Response Hilang dengan Compensate-Selective (orchestration only)
-
-**Counterfactual dari keputusan call-all.** S9s menjalankan skenario yang sama
-dengan S9, tetapi orchestrator menggunakan strategi **compensate-selective**
-(`SELECTIVE_COMPENSATE=true`): sebelum memanggil kompensasi untuk sebuah service,
-orchestrator **query database** untuk mengecek apakah service tersebut benar-benar
-memiliki row `committed`. Jika tidak ada, kompensasi **di-skip**. Tujuannya
-mengisolasi apakah strategi call-all (yang selalu memanggil keempat endpoint
-kompensasi) memang menghasilkan data outcome berbeda dengan selective (yang hanya
-memanggil yang committed).
-
-Hasil (30 run, orchestration): **30/30 `compensated`** — konsisten dengan S9
-(call-all). Pada S9s, shipping (yang tidak pernah commit) di-skip (terlihat dari
-log "skip compensate (not committed)"); order, payment, inventory (yang committed
-sebelum response di-drop) dikompensasi.
-
-**Temuan penting — prediksi orphaned commit tidak terjadi:** Claude (penilai
-independen) memprediksi bahwa selective compensation akan menghasilkan **orphaned
-commit** (data sukses tanpa kompensasi → inkonsistensi permanen). Hasil tidak
-mendukung prediksi tersebut pada n=10 maupun n=30. Alasannya: selective
-compensation membaca **kebenaran di database** (row `committed`), bukan keyakinan
-orchestrator. Langkah yang sebenarnya commit — termasuk yang kompensasinya "tidak
-perlu" (false negative) — tetap dikompensasi karena ada buktinya. Tidak ada skenario
-pada S9 di mana sebuah step commit tetapi orchestrator "tidak tahu" sampai-sampai skip
-kompensasi, karena selective logic selalu memverifikasi DB truth (kode `stepCommitted`
-di `internal/orchestration/orchestrator.go` baris 59-73: query `SELECT status
-FROM <table> WHERE saga_id = $1`). Hasil dengan n=30: 30/30 compensated + 30/30
-needless = 100% konsisten, latency 10159 ± 42 ms — **variansi rendah**, mengonfirmasi
-bahwa hasilnya stabil dan bukan kebetulan dari outlier kecil.
-
-**Implikasi untuk caveat call-all:** percobaan ini **memperkuat** bahwa
-desain call-all pada S9 bersifat konservatif-benign — baik call-all maupun
-selective menghasilkan outcome data identik (semua participating services
-`compensated`, 100% konsisten). Perbedaan call-all hanya berupa **HTTP call
-tambahan ke shipping** yang tidak participated (no-op, hanya menambah latency
-±30 ms). Konsekuensi desain call-all pada S9 murni **efisiensi**, bukan
-konsistensi. Caveat di paragraf sebelumnya tetap valid untuk konteks S2/S3
-di mana call-all membuat orchestrator mengirim lebih banyak HTTP call
-daripada yang strictly perlu, sehingga berpotensi mempengaruhi recovery time
-namun sulit diisolasi tanpa eksperimen S2s/S3s yang juga memerlukan selective
-mode.
-
-Latency S9s (10174 ± 203 ms) sedikit lebih tinggi dari S9 (10127 ± 15 ms) —
-tambahan overhead 4 query DB di `fail()` saat selective mode aktif. Untuk
-eksperimen S2/S3 (di mana recovery time terdefinisi dan call-all mungkin
-memberi kontribusi pada selisih), eksperimen S2s/S3s akan menjadi lanjutan
-yang diperlukan untuk mengisolasi confounding tersebut secara empiris.
-
-Data: `docs/runs/S9s/orchestration/`.
-
-### S2s & S3s — Counterfactual Call-All di Skenario Step-Failure (orchestration only)
-
-**Isolasi confounding call-all pada RM3.** S2s dan S3s menjalankan skenario yang
-sama dengan S2 (Shipping gagal) dan S3 (Inventory gagal), tetapi orchestrator
-menggunakan strategi **compensate-selective** — sebelum memanggil kompensasi,
-orchestrator query database untuk mengecek apakah service tersebut benar-benar
-commit; jika tidak, kompensasi di-skip. Tujuannya: mengisolasi apakah selisih
-recovery time S2/S3 choreography vs orchestration disebabkan oleh arsitektur
-koordinasi, atau oleh fakta bahwa call-all orchestrator mengirim lebih banyak HTTP call
-dari yang strictly perlu.
-
-Hasil (30 run, orchestration, n=30 sesuai proposal 3.6):
-- **S2s**: 30/30 compensated, recovery **28 ± 6 ms** (stabil, tanpa outlier).
-- **S3s**: 30/30 compensated, recovery **24 ± 8 ms**.
-
-**Isolasi confounding — hasil utama untuk RM3 (dengan n=30):**
-- S3 (call-all): 26,0 ± 6,5 ms; **S3s (selective): 24 ± 8 ms** — selisih
-  **-2 ms** (selective justru sedikit lebih cepat, tapi selisih dalam std dev).
-  Confirmed: **call-all tidak menambah overhead terukur pada recovery time**.
-  Selisih 13 ms pada S3 (choreography 12,8 ms vs orchestration 26,0 ms) bukan
-  karena call-all, tapi karena **arsitektur koordinasinya** — choreography memang
-  intrinsik lebih cepat dalam kompensasi.
-- S2 (call-all): 29 ± 6 ms; S2s (selective): 28 ± 6 ms — selisih **1 ms** dalam
-  std dev. Konfirmasi lebih kuat dibanding n=10 sebelumnya (yang menunjukkan 67 ms
-  outlier 296 ms di run 1).
-
-**Implikasi final untuk RM3:** klaim "choreography pulih lebih cepat" bukan
-artefak jumlah HTTP call. Selisih choreography vs orchestration murni
-bersifat arsitektural. Temuan ini memperkuat signifikansi temuan RM3
-sebelumnya (p<0,001 di S2 dan S3).
-
-Data: `docs/runs/S2s/orchestration/`, `docs/runs/S3s/orchestration/`.
-
 **Caveat penting (konsekuensi desain, bukan properti universal):** hasil S9
 (100% konsisten, needless compensation) adalah konsekuensi langsung dari
 strategi kompensasi **call-all** pada `fail()` di `internal/orchestration/
@@ -354,10 +254,7 @@ pendekatan masing-masing.
    pada skenario kegagalan langkah — choreography lebih cepat (S2: 22,0 vs
    28,7 ms, p=0,0002; S3: 12,8 vs 26,0 ms, p<0,0001). Magnitudo selisih kecil
    (±5–13 ms) dan keduanya pulih dalam puluhan milidetik. Klaim awal
-   "orchestration jauh lebih cepat pulih" tidak terdukung. **Confounding
-   call-all telah diisolasi empiris** via S3s (selective compensate): recovery
-   time call-all (26,0 ms) ≈ selective (28 ms) → call-all tidak menambah
-   overhead, selisih choreography vs orchestration murni arsitektural.
+   "orchestration jauh lebih cepat pulih" tidak terdukung.
 4. **Periode inkonsistensi sementara**: tidak berbeda signifikan pada S1/S2
    (31/31 dan 48/49 ms), tetapi **±7× lebih lama di choreography pada beban
    tinggi** (S7: 6238 vs 864 ms, p<0,0001) karena serialisasi rantai event.
@@ -436,9 +333,8 @@ pada response loss).
   belum diisolasi.
 - **Kebocoran SELECTIVE_COMPENSATE antar-run (T1).** PowerShell `$env:VAR`
   persist dalam satu sesi terminal. Sebelum perbaikan, `$env:SELECTIVE_COMPENSATE`
-  hanya di-set eksplisit di branch S9/S9s/S2s/S3s — branch lain (S1-S8) tidak
-  menyentuhnya. Kalau S9s/S2s/S3s dijalankan duluan di satu sesi, nilai `true`
-  tertinggal dan S2/S3/S6/S8 bisa ikut terpengaruh. Diperbaiki: semua branch
+  hanya di-set eksplisit di branch S9 — branch lain (S1-S8) tidak
+  menyentuhnya. Diperbaiki: semua branch
   sekarang secara eksplisit set `$env:SELECTIVE_COMPENSATE = "false"`.
   **Bukti retroaktif bahwa kebocoran tidak pernah terjadi pada data lama:**
   keberadaan entri saga_log `"compensated"` palsu di S2 Shipping dan S3

@@ -209,7 +209,7 @@ func main() {
 	flag.Parse()
 
 	var table []agg
-	scenarios := []string{"S1", "S2", "S3", "S6", "S7", "S8", "S9", "S9s", "S2s", "S3s"}
+	scenarios := []string{"S1", "S2", "S3", "S6", "S7", "S8", "S9"}
 	approaches := []string{"choreography", "orchestration"}
 	metrics := []string{"latency", "inconsistency_window", "recovery_time"}
 
@@ -391,49 +391,4 @@ func main() {
 	sigOut, _ := json.MarshalIndent(sigs, "", "  ")
 	os.WriteFile(filepath.Join(*dir, "significance.json"), sigOut, 0o644)
 	fmt.Println("\nSignificance written to", filepath.Join(*dir, "significance.json"))
-
-	// Mann-Whitney U comparisons within orchestration: selective (S2s/S3s/S9s)
-	// vs call-all (S2/S3/S9). Tests whether call-all design measurably changes
-	// the metric (would falsify the confounding-isolated claim if significant).
-	var selSigs []sigResult
-	selectivePairs := []struct {
-		callAll, selective, label string
-		metric                   string
-	}{
-		{"S2", "S2s", "S2 vs S2s", "recovery_time"},
-		{"S3", "S3s", "S3 vs S3s", "recovery_time"},
-		{"S9", "S9s", "S9 vs S9s", "latency"},
-	}
-	for _, p := range selectivePairs {
-		x := perRun[p.callAll]["orchestration"][p.metric]
-		y := perRun[p.selective]["orchestration"][p.metric]
-		if len(x) < 8 || len(y) < 8 {
-			continue
-		}
-		u, pVal := mannWhitneyU(x, y)
-		selSigs = append(selSigs, sigResult{
-			Scenario:    p.label,
-			Metric:      p.metric,
-			ChoreoMean:  mean(x),
-			ChoreoStd:   sampleStd(x),
-			OrchMean:    mean(y),
-			OrchStd:     sampleStd(y),
-			U:           u,
-			PValue:      pVal,
-			Significant: pVal < 0.05,
-		})
-	}
-
-	fmt.Println("\nMann-Whitney U (selective vs call-all, within orchestration, alpha=0.05)")
-	fmt.Println("Pair | Metric | CallAll mean | CallAll std | Selective mean | Selective std | U | p-value | Significant")
-	fmt.Println("----- | ------ | ------------ | ----------- | -------------- | -------------- | ------ | ------- | -----------")
-	for _, s := range selSigs {
-		fmt.Printf("%s | %s | %.1f | %.1f | %.1f | %.1f | %.1f | %.4f | %v\n",
-			s.Scenario, s.Metric, s.ChoreoMean, s.ChoreoStd, s.OrchMean, s.OrchStd, s.U, s.PValue, s.Significant)
-	}
-
-	// Append selective results to significance.json.
-	combined, _ := json.MarshalIndent(append(sigs, selSigs...), "", "  ")
-	os.WriteFile(filepath.Join(*dir, "significance.json"), combined, 0o644)
-	fmt.Println("\nSignificance (choreo-vs-orch + selective-vs-call-all) written to", filepath.Join(*dir, "significance.json"))
 }

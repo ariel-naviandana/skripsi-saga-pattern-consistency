@@ -191,7 +191,7 @@ Tekan `Ctrl+C` untuk keluar dari log.
 
 ## 6. Menjalankan Skenario
 
-Ada 12 skenario total (S1-S9 + S9s + S2s + S3s). Default run count = 30 (sesuai proposal 3.6). S7 pakai 500 transaksi per run (bukan 30 run terpisah).
+Ada 9 skenario total (S1-S9). Default run count = 30 (sesuai proposal 3.6). S7 pakai 500 transaksi per run (bukan 30 run terpisah).
 
 ### 6.1. Panduan run-scenario
 
@@ -206,13 +206,13 @@ bash scripts/run-scenario.sh S<nama> <choreography|orchestration> 30
 ```
 
 **Argumen:**
-- `-Scenario S<nama>` — salah satu dari: S1, S2, S3, S6, S7, S8, S9, S9s, S2s, S3s
+- `-Scenario S<nama>` — salah satu dari: S1, S2, S3, S6, S7, S8, S9
 - `-Approach` — `choreography` atau `orchestration` (tidak applicable untuk S4/S5 yang pakai run-crash)
 - `-Runs` — jumlah iterasi (default 30; S7 selalu 500 transaksi per run)
 
 ### 6.2. Skrip otomatis vs run manual
 
-**Skrip otomatis (S1-S3, S6-S9, S9s, S2s, S3s):** `run-scenario.ps1`/`.sh` handle reset + fault injection + workload generation + JSON output per run. Tinggal tunggu.
+**Skrip otomatis (S1-S3, S6-S9):** `run-scenario.ps1`/`.sh` handle reset + fault injection + workload generation + JSON output per run. Tinggal tunggu.
 
 **Skenario crash (S4, S5):** pakai `run-crash.ps1` (hanya untuk Windows):
 ```powershell
@@ -250,13 +250,8 @@ Buka PowerShell, jalankan:
 # S8 Event loss (choreography only)
 .\scripts\run-scenario.ps1 -Scenario S8 -Approach choreography -Runs 30
 
-# S9 Response loss + S9s selective compensate (orchestration only)
+# S9 Response loss (orchestration only)
 .\scripts\run-scenario.ps1 -Scenario S9  -Approach orchestration -Runs 30
-.\scripts\run-scenario.ps1 -Scenario S9s -Approach orchestration -Runs 30
-
-# S2s/S3s Selective compensate counterfactual (orchestration only)
-.\scripts\run-scenario.ps1 -Scenario S2s -Approach orchestration -Runs 30
-.\scripts\run-scenario.ps1 -Scenario S3s -Approach orchestration -Runs 30
 ```
 
 **S4/S5 (crash):**
@@ -279,7 +274,7 @@ Starting services (approach=orchestration)...
 Done. Results in docs/runs/S2/orchestration
 ```
 
-Total waktu: S1-S3 ~2-3 menit per run, S6 ~1 menit, S7 ~5-10 menit per run, S8/S9/S9s/S2s/S3s ~10 detik per run. **Total semua skenario: ~1-1,5 jam.**
+Total waktu: S1-S3 ~2-3 menit per run, S6 ~1 menit, S7 ~5-10 menit per run, S8/S9 ~10 detik per run. **Total semua skenario: ~1-1,5 jam.**
 
 ### 6.5. Output file yang dihasilkan
 
@@ -332,13 +327,10 @@ S1 | orchestration | 30 | 30 | 30 | 0 | 0 | 0 | 0 | 0 | 0 | 100.0 | 0.0 | 0 | N/
 S2 | choreography | 30 | 30 | 0 | 30 | 0 | 0 | 0 | 0 | 0 | 100.0 | 100.0 | 30 | 22 | 12 | 42 | 7 | 30 | 49 | 26 | 114 | 18 | 1639 | 1591 | 1743 | 35
 S2 | orchestration | 30 | 30 | 0 | 30 | 0 | 0 | 0 | 0 | 0 | 100.0 | 100.0 | 30 | 29 | 19 | 45 | 6 | 30 | 52 | 37 | 74 | 9 | 163 | 127 | 222 | 26
 ...
-S2s | orchestration | 30 | 30 | 0 | 30 | 0 | 0 | 0 | 0 | 0 | 100.0 | 100.0 | 30 | 28 | 22 | 46 | 6 | 30 | 56 | 42 | 125 | 16 | 166 | 141 | 231 | 23
 S3 | choreography | 30 | 30 | 0 | 30 | 0 | 0 | 0 | 0 | 0 | 100.0 | 100.0 | 30 | 13 | 8 | 20 | 3 | 30 | 27 | 16 | 42 | 6 | 1624 | 1595 | 1665 | 19
 S3 | orchestration | 30 | 30 | 0 | 30 | 0 | 0 | 0 | 0 | 0 | 100.0 | 100.0 | 30 | 26 | 12 | 45 | 7 | 30 | 40 | 20 | 67 | 10 | 150 | 84 | 212 | 33
-S3s | orchestration | 30 | 30 | 0 | 30 | 0 | 0 | 0 | 0 | 0 | 100.0 | 100.0 | 30 | 24 | 17 | 60 | 8 | 30 | 42 | 31 | 80 | 9 | 145 | 122 | 224 | 20
 ...
 S9 | orchestration | 30 | 30 | 0 | 30 | 0 | 0 | 0 | 30 | 100 | 100.0 | 100.0 | 0 | N/A | N/A | N/A | N/A | 30 | 10048 | 10029 | 10075 | 14 | 10159 | 10105 | 10312 | 42
-S9s | orchestration | 30 | 30 | 0 | 30 | 0 | 0 | 0 | 30 | 100 | 100.0 | 100.0 | 0 | N/A | N/A | N/A | N/A | 30 | 10035 | 10023 | 10061 | 10 | 10130 | 10102 | 10160 | 18
 
 Summary written to docs/runs/summary.json
 
@@ -358,14 +350,7 @@ S6 | inconsistency_window | 27.7 | 6.8 | 41.7 | 8.2 | 66.5 | 0.0000 | true
 S7 | latency | 8476.1 | 1541.5 | 5021.1 | 681.3 | 893.0 | 0.0000 | true
 S7 | inconsistency_window | 5152.0 | 1428.9 | 454.3 | 282.6 | 900.0 | 0.0000 | true
 
-Mann-Whitney U (selective vs call-all, within orchestration, alpha=0.05)
-Pair | Metric | CallAll mean | CallAll std | Selective mean | Selective std | U | p-value | Significant
------ | ------ | ------------ | ----------- | -------------- | -------------- | ------ | ------- | -----------
-S2 vs S2s | recovery_time | 28.7 | 6.4 | 27.8 | 6.4 | 495.5 | 0.5046 | false
-S3 vs S3s | recovery_time | 26.0 | 6.5 | 24.2 | 7.6 | 592.0 | 0.0359 | true
-S9 vs S9s | latency | 10158.9 | 41.6 | 10130.1 | 18.5 | 667.5 | 0.0013 | true
-
-Significance (choreo-vs-orch + selective-vs-call-all) written to docs/runs/significance.json
+Significance (choreo-vs-orch) written to docs/runs/significance.json
 ```
 
 ### 7.3. File output JSON
@@ -374,7 +359,7 @@ Significance (choreo-vs-orch + selective-vs-call-all) written to docs/runs/signi
 - Count, committed, compensated, inconsistent, not_found, unrecorded, needless, recovery_count, latency (avg/min/max/std), inconsistency_window (avg/min/max/std), recovery_time (avg/min/max/std), consistency%, CTSR%, needless_rate
 
 **`docs/runs/significance.json`** — hasil Mann-Whitney U:
-- Per skenario per metrik: choreo-vs-orch comparison + selective-vs-call-all comparison (S2/S2s, S3/S3s, S9/S9s)
+- Per skenario per metrik: choreo-vs-orch comparison
 
 ### 7.4. Verifikasi data di DB (manual)
 
@@ -478,7 +463,7 @@ Stop-Process -Id <PID> -Force
 
 **Gejala:** kolom AvgRec menampilkan "0" alih-alih angka valid.
 
-**Status:** Sudah diperbaiki di commit #15 — tabel sekarang menampilkan "N/A" untuk skenario tanpa recovery time (S1, S6, S7, S9, S9s). Kalau masih melihat "0", pastikan sudah `go build -o bin/analyze` ulang dengan kode terbaru.
+**Status:** Sudah diperbaiki di commit #15 — tabel sekarang menampilkan "N/A" untuk skenario tanpa recovery time (S1, S6, S7, S9). Kalau masih melihat "0", pastikan sudah `go build -o bin/analyze` ulang dengan kode terbaru.
 
 ### 9.5. Kafka topics tidak ada
 
@@ -531,7 +516,6 @@ docker compose ps
 
 # Jalankan skenario (contoh)
 .\scripts\run-scenario.ps1 -Scenario S1 -Approach choreography -Runs 30
-.\scripts\run-scenario.ps1 -Scenario S9s -Approach orchestration -Runs 30
 .\scripts\run-crash.ps1 -Scenario S4 -Runs 10
 
 # Lihat hasil
@@ -547,13 +531,13 @@ docker compose down -v    # + hapus data
 | File | Isi |
 |------|-----|
 | `docs/REPORT.md` | Laporan lengkap (tabel, analisis, catatan metodologi) |
-| `docs/SCENARIOS.md` | Definisi 12 skenario + fault config |
+| `docs/SCENARIOS.md` | Definisi 9 skenario + fault config |
 | `docs/HOW-TO-RUN.md` | File ini |
 | `docs/EXPLANATION.md` | Penjelasan eksperimen & FAQ |
 | `README.md` | Quick start + ringkasan skenario |
 | `cmd/analyze/main.go` | CLI summary + MWU |
 | `cmd/workload-generator/main.go` | CLI generate transaksi |
-| `cmd/orchestrator/main.go` | Central coordinator + selective compensate |
+| `cmd/orchestrator/main.go` | Central coordinator |
 | `internal/orchestration/orchestrator.go` | Core orchestrator logic |
 | `internal/common/faultinject.go` | Fault injection middleware |
 | `scripts/run-scenario.ps1` / `.sh` | Skenario runner |
@@ -561,7 +545,7 @@ docker compose down -v    # + hapus data
 | `scripts/setup.sh` | Kafka topics creator |
 | `scripts/reset.sh` | DB truncate + Redis flush + fault reset |
 
-### 10.3. Daftar 12 skenario
+### 10.3. Daftar 9 skenario
 
 | Skenario | Approach | Tujuan | Fault |
 |----------|-----------|--------|-------|
@@ -574,9 +558,6 @@ docker compose down -v    # + hapus data
 | S7 | choreo + orch | 500 tx/konkuren | – (count=500) |
 | S8 | choreo only | Event loss | DROP_EVENT=saga.order.created |
 | S9 | orch only | Response loss | DROP_RESPONSE_AT_STEP=inventory |
-| S9s | orch only | S9 + selective compensate | + SELECTIVE_COMPENSATE=true |
-| S2s | orch only | S2 + selective | + SELECTIVE_COMPENSATE=true |
-| S3s | orch only | S3 + selective | + SELECTIVE_COMPENSATE=true |
 
 ### 10.4. Total estimasi waktu
 
@@ -585,7 +566,7 @@ docker compose down -v    # + hapus data
 | Setup awal (build + first start + setup.sh) | 10-15 menit |
 | S1-S3, S6, S8 (×2 approach) | ~25 menit |
 | S7 (×2 approach, 500 tx/run) | ~25 menit |
-| S9, S9s, S2s, S3s | ~10 menit |
+| S9 | ~5 menit |
 | S4, S5 (crash, 30 runs each) | ~30 menit |
 | Regenerate summary + analyze | <1 menit |
 | **TOTAL** | **~105-120 menit** (~2 jam) |
@@ -598,11 +579,9 @@ docker compose down -v    # + hapus data
 - `#8`: S9 response loss
 - `#9`: dokumentasi caveats (call-all confounding, recovery time S9)
 - `#10`: re-run semua dengan kode final
-- `#11`: S9s selective compensate counterfactual
-- `#12`: S2s/S3s + EXPLANATION.md
 - `#13`: update Caveat & Keterbatasan + Tahap 7 table
-- `#14`: n=30 untuk S8/S9/S9s/S2s/S3s + needless_compensation_rate + error logging + stepCommitted fallback log
-- `#15`: MWU selective-vs-call-all (n=30) + guard display N/A + S7 re-run + error_detail
+- `#14`: n=30 untuk S8/S9 + needless_compensation_rate + error logging + stepCommitted fallback log
+- `#15`: guard display N/A + S7 re-run + error_detail
 
 ---
 
@@ -619,9 +598,7 @@ foreach ($s in @("S1","S2","S3","S6","S7")) {
     }
 }
 .\scripts\run-scenario.ps1 -Scenario S8 -Approach choreography -Runs 30
-foreach ($s in @("S9","S9s","S2s","S3s")) {
-    .\scripts\run-scenario.ps1 -Scenario $s -Approach orchestration -Runs 30
-}
+.\scripts\run-scenario.ps1 -Scenario S9 -Approach orchestration -Runs 30
 .\scripts\run-crash.ps1 -Scenario S4 -Runs 30
 .\scripts\run-crash.ps1 -Scenario S5 -Runs 30
 

@@ -34,8 +34,7 @@ func main() {
 		fc,
 	)
 
-	// Wire service databases for SELECTIVE_COMPENSATE (S9s); connections
-	// are cheap to keep open and unused when the flag is off.
+	// Wire service databases; connections are cheap to keep open.
 	openDB := func(dsn postgres.Config) *pgxpool.Pool {
 		p, err := postgres.NewPool(ctx, dsn)
 		if err != nil {

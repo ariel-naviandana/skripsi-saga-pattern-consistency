@@ -750,13 +750,6 @@ Orchestrator timeout → mengira inventory GAGAL → kompensasi penuh
 
 ### 6.6 Selective vs Call-All
 
-| Mode | Perilaku | HTTP Calls |
-|------|----------|------------|
-| **Call-All** | Orchestrator panggil SEMUA service, tanpa cek | 4 calls |
-| **Selective** | Orchestrator query DB dulu, hanya panggil yang committed | 3-4 calls |
-
-**Selective mode bukan solusi untuk false negative (S9)** — karena semua service memang committed, selective tetap kompensasi semua.
-
 ### 6.7 500 Transaksi Konkuren (S7)
 
 **Tidak ada fault injection** — semua transaksi berjalan normal, tapi 500 sekaligus.
@@ -818,9 +811,6 @@ Kalau env var nggak diset → `ShouldFail()` return false → tidak ada fault �
 | S7 | 500 konkuren | Tidak ada | 100%/99.7% committed | 100% |
 | S8 | Event loss | `DROP_EVENT` | 1 committed, 3 kosong | 0% |
 | S9 | Response loss | `DROP_RESPONSE` | 3 compensated, 1 kosong | 0% |
-| S9s | S9 + selective | `SELECT_COMPENSATE` | 3 compensated, 1 kosong | 0% |
-| S2s | S2 + selective | `SELECT_COMPENSATE` | 100% compensated | 100% |
-| S3s | S3 + selective | `SELECT_COMPENSATE` | 100% compensated | 100% |
 
 ---
 
@@ -846,9 +836,6 @@ Kalau env var nggak diset → `ShouldFail()` return false → tidak ada fault �
 | S6 | latency | 123 ms | 156 ms | <0.0001 | **Yes** |
 | S7 | latency | 7170 ms | 5898 ms | <0.0001 | **Yes** |
 | S7 | window | 2818 ms | 465 ms | <0.0001 | **Yes** |
-| S9s | latency | — | 10130 ms | 0.001 | **Yes** |
-| S2s | recovery | — | 28 ms | 0.505 | No |
-| S3s | recovery | — | 24 ms | 0.036 | **Yes** |
 
 ### 8.3 Statistik: Mann-Whitney U Test
 
