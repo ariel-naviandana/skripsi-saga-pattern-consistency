@@ -16,25 +16,79 @@ agregat di `docs/runs/summary.json` (dihasilkan oleh `go run ./cmd/analyze`).
   konsisten, dari timestamp `saga_log`), **periode inkonsistensi sementara**
   (saga_log pertama → terakhir, proposal 3.7), **latency end-to-end**, dan
   **throughput (TPS)**.
-- Statistik deskriptif per skenario: Mean ± StdDev (Min–Max) untuk semua metrik
+- Statistik deskriptif per skenario: Mean, StdDev, Min, Max untuk semua metrik
   kontinu (proposal 3.7).
 
 ## Hasil Agregat (30 iterasi, kode final)
 
-Format tabel: **Mean ± StdDev (Min–Max)** untuk metrik kontinu.
+Format tabel: **Mean**, **StdDev**, **Min**, **Max** kolom terpisah untuk metrik kontinu.
 
 ### Skenario S1/S2/S3/S6 (1 transaksi per iterasi, 30 iterasi)
 
-| Skenario | Approach | Consistency% | CTSR% | Recovery (ms) | Inconsistency window (ms) | Latency (ms) | Throughput (TPS) |
-|----------|----------|-------------|-------|---------------|---------------------------|--------------|------------------|
-| S1 | choreography | 100.0 | — | — | 42 ± 23 (20–124) | 427 ± 633 (82–1724) | 7.2 ± 3.6 (0.6–12.0) |
-| S1 | orchestration | 100.0 | — | — | 26 ± 7 (18–51) | 128 ± 33 (83–236) | 8.2 ± 1.8 (4.2–11.9) |
-| S2 | choreography | 100.0 | 100.0 | 22 ± 7 (12–42) | 49 ± 18 (26–114) | 1639 ± 35 (1591–1743) | 0.6 ± 0.0 (0.6–0.6) |
-| S2 | orchestration | 100.0 | 100.0 | 29 ± 6 (19–45) | 52 ± 9 (37–74) | 163 ± 26 (127–222) | 6.2 ± 0.9 (4.5–7.8) |
-| S3 | choreography | 100.0 | 100.0 | 13 ± 3 (8–20) | 27 ± 6 (16–42) | 1624 ± 19 (1595–1665) | 0.6 ± 0.0 (0.6–0.6) |
-| S3 | orchestration | 100.0 | 100.0 | 26 ± 7 (12–45) | 40 ± 10 (20–67) | 150 ± 33 (84–212) | 7.0 ± 1.8 (4.7–11.8) |
-| S6 | choreography | 0.0 | 0.0 | tak pulih | 28 ± 7 (21–50) | 123 ± 23 (88–166) | 8.3 ± 1.5 (6.0–11.2) |
-| S6 | orchestration | 0.0 | 0.0 | tak pulih | 42 ± 8 (29–69) | 156 ± 30 (113–265) | 6.6 ± 1.1 (3.8–8.8) |
+**Metrik Outcome**
+
+| Skenario | Approach | Consistency% | CTSR% |
+|----------|----------|-------------|-------|
+| S1 | choreography | 100.0 | — |
+| S1 | orchestration | 100.0 | — |
+| S2 | choreography | 100.0 | 100.0 |
+| S2 | orchestration | 100.0 | 100.0 |
+| S3 | choreography | 100.0 | 100.0 |
+| S3 | orchestration | 100.0 | 100.0 |
+| S6 | choreography | 0.0 | 0.0 |
+| S6 | orchestration | 0.0 | 0.0 |
+
+**Recovery Time (ms)**
+
+| Skenario | Approach | Mean | StdDev | Min | Max |
+|----------|----------|------|--------|-----|-----|
+| S1 | choreography | — | — | — | — |
+| S1 | orchestration | — | — | — | — |
+| S2 | choreography | 22 | 7 | 12 | 42 |
+| S2 | orchestration | 29 | 6 | 19 | 45 |
+| S3 | choreography | 13 | 3 | 8 | 20 |
+| S3 | orchestration | 26 | 7 | 12 | 45 |
+| S6 | choreography | tak pulih | — | — | — |
+| S6 | orchestration | tak pulih | — | — | — |
+
+**Inconsistency Window (ms)**
+
+| Skenario | Approach | Mean | StdDev | Min | Max |
+|----------|----------|------|--------|-----|-----|
+| S1 | choreography | 42 | 23 | 20 | 124 |
+| S1 | orchestration | 26 | 7 | 18 | 51 |
+| S2 | choreography | 49 | 18 | 26 | 114 |
+| S2 | orchestration | 52 | 9 | 37 | 74 |
+| S3 | choreography | 27 | 6 | 16 | 42 |
+| S3 | orchestration | 40 | 10 | 20 | 67 |
+| S6 | choreography | 28 | 7 | 21 | 50 |
+| S6 | orchestration | 42 | 8 | 29 | 69 |
+
+**Latency (ms)**
+
+| Skenario | Approach | Mean | StdDev | Min | Max |
+|----------|----------|------|--------|-----|-----|
+| S1 | choreography | 427 | 633 | 82 | 1724 |
+| S1 | orchestration | 128 | 33 | 83 | 236 |
+| S2 | choreography | 1639 | 35 | 1591 | 1743 |
+| S2 | orchestration | 163 | 26 | 127 | 222 |
+| S3 | choreography | 1624 | 19 | 1595 | 1665 |
+| S3 | orchestration | 150 | 33 | 84 | 212 |
+| S6 | choreography | 123 | 23 | 88 | 166 |
+| S6 | orchestration | 156 | 30 | 113 | 265 |
+
+**Throughput (TPS)**
+
+| Skenario | Approach | Mean | StdDev | Min | Max |
+|----------|----------|------|--------|-----|-----|
+| S1 | choreography | 7.2 | 3.6 | 0.6 | 12.0 |
+| S1 | orchestration | 8.2 | 1.8 | 4.2 | 11.9 |
+| S2 | choreography | 0.6 | 0.0 | 0.6 | 0.6 |
+| S2 | orchestration | 6.2 | 0.9 | 4.5 | 7.8 |
+| S3 | choreography | 0.6 | 0.0 | 0.6 | 0.6 |
+| S3 | orchestration | 7.0 | 1.8 | 4.7 | 11.8 |
+| S6 | choreography | 8.3 | 1.5 | 6.0 | 11.2 |
+| S6 | orchestration | 6.6 | 1.1 | 3.8 | 8.8 |
 
 ### Skenario S4/S5 (crash, 30 iterasi)
 
@@ -48,10 +102,33 @@ latency/throughput end-to-end karena transaksi di-crash di tengah jalan).
 
 ### Skenario S7 (konkurensi, 500 transaksi/iterasi → 15.000 transaksi total)
 
-| Skenario | Approach | Consistency% | Needless | Inconsistency window (ms) | Latency (ms) | Throughput (TPS) |
-|----------|----------|-------------|----------|---------------------------|--------------|------------------|
-| S7 | choreography | 100.0 | 0 | 2818 ± 1499 (36–9070) | 7170 ± 1806 (481–13167) | 61.5 ± 20.5 (38.0–152.5) |
-| S7 | orchestration | 99.7 | 0 | 416 ± 389 (15–2547) | 5921 ± 801 (602–7766) | 79.5 ± 7.2 (64.3–96.9) |
+**Metrik Outcome**
+
+| Skenario | Approach | Consistency% | Needless |
+|----------|----------|-------------|----------|
+| S7 | choreography | 100.0 | 0 |
+| S7 | orchestration | 99.7 | 0 |
+
+**Inconsistency Window (ms)**
+
+| Skenario | Approach | Mean | StdDev | Min | Max |
+|----------|----------|------|--------|-----|-----|
+| S7 | choreography | 2818 | 1499 | 36 | 9070 |
+| S7 | orchestration | 416 | 389 | 15 | 2547 |
+
+**Latency (ms)**
+
+| Skenario | Approach | Mean | StdDev | Min | Max |
+|----------|----------|------|--------|-----|-----|
+| S7 | choreography | 7170 | 1806 | 481 | 13167 |
+| S7 | orchestration | 5921 | 801 | 602 | 7766 |
+
+**Throughput (TPS)**
+
+| Skenario | Approach | Mean | StdDev | Min | Max |
+|----------|----------|------|--------|-----|-----|
+| S7 | choreography | 61.5 | 20.5 | 38.0 | 152.5 |
+| S7 | orchestration | 79.5 | 7.2 | 64.3 | 96.9 |
 
 \* Orchestration: 48 request not_found dari 2 dari 30 run (~6,7% run terkena);
 sisanya 14.952 committed. Kejenuhan orchestrator sebagai titik tunggal bersifat
@@ -59,10 +136,33 @@ intermittent.
 
 ### Skenario S8/S9 (sinyal koordinasi hilang, 30 iterasi)
 
-| Skenario | Approach | Consistency% | CTSR% | Needless | Inconsistency window (ms) | Latency (ms) | Throughput (TPS) |
-|----------|----------|-------------|-------|----------|---------------------------|--------------|------------------|
-| S8 | choreography | 0.0 | 0.0 | 0 | 0 (stuck) | 12349 ± 24 (12309–12388) | 0.1 ± 0.0 (0.1–0.1) |
-| S9 | orchestration | 100.0 | 100.0 | 30 (100%) | 10048 ± 14 (10029–10075) | 10159 ± 42 (10105–10312) | 0.1 ± 0.0 (0.1–0.1) |
+**Metrik Outcome**
+
+| Skenario | Approach | Consistency% | CTSR% | Needless |
+|----------|----------|-------------|-------|----------|
+| S8 | choreography | 0.0 | 0.0 | 0 |
+| S9 | orchestration | 100.0 | 100.0 | 30 (100%) |
+
+**Inconsistency Window (ms)**
+
+| Skenario | Approach | Mean | StdDev | Min | Max | Keterangan |
+|----------|----------|------|--------|-----|-----|------------|
+| S8 | choreography | 0 | — | 0 | 0 | stuck |
+| S9 | orchestration | 10048 | 14 | 10029 | 10075 | — |
+
+**Latency (ms)**
+
+| Skenario | Approach | Mean | StdDev | Min | Max |
+|----------|----------|------|--------|-----|-----|
+| S8 | choreography | 12349 | 24 | 12309 | 12388 |
+| S9 | orchestration | 10159 | 42 | 10105 | 10312 |
+
+**Throughput (TPS)**
+
+| Skenario | Approach | Mean | StdDev | Min | Max |
+|----------|----------|------|--------|-----|-----|
+| S8 | choreography | 0.1 | 0.0 | 0.1 | 0.1 |
+| S9 | orchestration | 0.1 | 0.0 | 0.1 | 0.1 |
 
 S8/S9 (event/response loss) dijalankan 30×; latency-nya mencakup window
 konfirmasi (±10 detik quiescence/timeout) karena saga tidak pernah selesai normal.
